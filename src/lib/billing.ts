@@ -1,3 +1,5 @@
+import { detectPeriodMode, shiftPeriod } from "./periodLabel";
+
 export type Meter = {
   mainPrev: number;
   mainCurr: number;
@@ -18,6 +20,8 @@ export type Period = {
   water: Meter;
   payA: Payment;
   payB: Payment;
+  /** VAT % frozen when the period is created, so a later change in settings doesn't rewrite old bills. */
+  vatRate?: number;
 };
 
 export type Settings = { nameA: string; nameB: string; vatRate: number };
@@ -52,29 +56,55 @@ export function calcMeter(m: Meter, vatRate: number): MeterResult {
   };
 }
 
+/** The period's own VAT rate; older periods saved before it existed fall back to the settings rate. */
+export const periodVat = (p: Period, fallback: number) => p.vatRate ?? fallback;
+
 export function calcPeriod(p: Period, vatRate: number) {
-  const elec = calcMeter(p.elec, vatRate);
-  const water = calcMeter(p.water, vatRate);
+  const vat = periodVat(p, vatRate);
+  const elec = calcMeter(p.elec, vat);
+  const water = calcMeter(p.water, vat);
   return { elec, water, totalA: r2(elec.costA + water.costA), totalB: r2(elec.costB + water.costB) };
 }
 
 const emptyMeter = (): Meter => ({ mainPrev: 0, mainCurr: 0, aPrev: 0, aCurr: 0, rate: 0, vat: true, fixed: 0 });
 const emptyPay = (): Payment => ({ paid: false, amount: 0, date: "", notes: "" });
 
-/** New period; carries previous readings, rates and fixed fees from the latest prior period. */
-export function newPeriod(prev?: Period): Period {
-  const today = new Date();
-  const start = prev?.end ?? new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
+/** Local-calendar YYYY-MM-DD (toISOString would shift to UTC and lose a day in Israel after midnight). */
+export function localISO(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Amount actually received; a payment marked paid without an amount counts as paid in full. */
+export const paidAmount = (pay: Payment, total: number) => (pay.paid ? pay.amount || total : 0);
+
+/**
+ * New period; carries previous readings, rates and fixed fees from the latest prior period.
+ * Calendar periods (one or two whole months) continue with the next block; other ranges start the day after.
+ */
+export function newPeriod(prev?: Period, vatRate?: number, today = new Date()): Period {
+  const now = localISO(today);
+  let start = localISO(new Date(today.getFullYear(), today.getMonth(), 1));
+  let end = now;
+  if (prev) {
+    const mode = detectPeriodMode(prev.start, prev.end);
+    if (mode === "custom") {
+      start = shiftPeriod(prev.end, prev.end, "custom", 1).start;
+      end = now > start ? now : start;
+    } else {
+      ({ start, end } = shiftPeriod(prev.start, prev.end, mode, 1));
+    }
+  }
   const carry = (m?: Meter): Meter =>
     m ? { ...emptyMeter(), mainPrev: m.mainCurr, mainCurr: m.mainCurr, aPrev: m.aCurr, aCurr: m.aCurr, rate: m.rate, vat: m.vat, fixed: m.fixed } : emptyMeter();
   return {
     id: crypto.randomUUID(),
     start,
-    end: today.toISOString().slice(0, 10),
+    end,
     elec: carry(prev?.elec),
     water: carry(prev?.water),
     payA: emptyPay(),
     payB: emptyPay(),
+    ...(vatRate === undefined ? {} : { vatRate }),
   };
 }
 
@@ -83,11 +113,12 @@ export const ils = (n: number) => `₪${n.toLocaleString("he-IL", { minimumFract
 
 export function summaryText(p: Period, s: Settings, who: "a" | "b") {
   const c = calcPeriod(p, s.vatRate);
+  const vatRate = periodVat(p, s.vatRate);
   const name = who === "a" ? s.nameA : s.nameB;
   const e = c.elec, w = c.water;
   const cons = (r: MeterResult) => (who === "a" ? r.a : r.b);
   const cost = (r: MeterResult) => (who === "a" ? r.costA : r.costB);
-  const vat = (m: Meter) => (m.vat ? ` (כולל מע"מ ${s.vatRate}%)` : "");
+  const vat = (m: Meter) => (m.vat ? ` (כולל מע"מ ${vatRate}%)` : "");
   const meterLines = (m: Meter) =>
     who === "a"
       ? `מונה דירה: ${m.aPrev} ← ${m.aCurr}`

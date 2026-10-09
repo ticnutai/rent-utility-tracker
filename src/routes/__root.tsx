@@ -107,7 +107,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="he" dir="rtl">
+    // The theme script sets data-theme before React hydrates; that attribute is expected to differ.
+    <html lang="he" dir="rtl" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>

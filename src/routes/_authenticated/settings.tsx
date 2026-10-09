@@ -3,7 +3,7 @@ import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { saveSettings, settingsQuery, type FullSettings } from "@/lib/data";
+import { periodsQuery, savePeriod, saveSettings, settingsQuery, type FullSettings } from "@/lib/data";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,6 +33,13 @@ function SettingsPage() {
 
   async function save() {
     try {
+      if (s.vatRate !== data.vatRate) {
+        // Periods saved before VAT was stored per period still follow the settings rate;
+        // pin them to the old rate first so changing VAT never rewrites past bills.
+        const periods = await qc.ensureQueryData(periodsQuery);
+        await Promise.all(periods.filter((p) => p.vatRate === undefined).map((p) => savePeriod({ ...p, vatRate: data.vatRate }, false)));
+        await qc.invalidateQueries({ queryKey: ["periods"] });
+      }
       await saveSettings(s);
       await qc.invalidateQueries({ queryKey: ["settings"] });
       toast.success("נשמר");

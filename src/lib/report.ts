@@ -1,4 +1,4 @@
-import { calcPeriod, fmtDate, type Period, type Settings } from "./billing";
+import { calcPeriod, fmtDate, paidAmount, type Period, type Settings } from "./billing";
 import { HE_MONTHS, monthRange, periodLabel, periodYear, rangesOverlap } from "./periodLabel";
 
 /** Latest period (by end date) ending on/before `start`; falls back to the overall latest when no start given. */
@@ -28,8 +28,8 @@ export function yearlyReport(periods: Period[], s: Settings, year: number) {
   const rows: ReportRow[] = list.map((p) => {
     const c = calcPeriod(p, s.vatRate);
     t.ea += c.elec.a; t.eb += c.elec.b; t.wa += c.water.a; t.wb += c.water.b; t.ta += c.totalA; t.tb += c.totalB;
-    if (p.payA.paid) t.pa += p.payA.amount || c.totalA;
-    if (p.payB.paid) t.pb += p.payB.amount || c.totalB;
+    t.pa += paidAmount(p.payA, c.totalA);
+    t.pb += paidAmount(p.payB, c.totalB);
     return [periodLabel(p.start, p.end) ?? `${fmtDate(p.start)}–${fmtDate(p.end)}`, fmtDate(p.start), fmtDate(p.end), c.elec.a, c.elec.b, c.water.a, c.water.b, c.totalA, c.totalB, p.payA.paid ? "כן" : "לא", p.payB.paid ? "כן" : "לא"];
   });
   const r2 = (n: number) => Math.round(n * 100) / 100;

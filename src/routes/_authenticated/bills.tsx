@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { PeriodPicker, PeriodTitle } from "@/components/PeriodPicker";
@@ -9,7 +9,7 @@ import { Plus, Zap, Droplets, Copy, MessageCircle, Trash2, ChevronLeft, Check, C
 import { latestBefore } from "@/lib/report";
 import { exportExcel, exportPdf } from "@/lib/exportReport";
 import { periodsQuery, savePeriod, deletePeriod, settingsQuery, type FullSettings } from "@/lib/data";
-import { calcPeriod, calcMeter, newPeriod, fmtDate, ils, summaryText, type Period, type Meter, type Payment } from "@/lib/billing";
+import { calcPeriod, calcMeter, newPeriod, fmtDate, ils, summaryText, localISO, paidAmount, periodVat, type Period, type Meter, type Payment } from "@/lib/billing";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,6 +25,8 @@ export const Route = createFileRoute("/_authenticated/bills")({
     { property: "og:type", content: "website" },
     { name: "twitter:card", content: "summary" },
   ] }),
+  validateSearch: (search: Record<string, unknown>): { edit?: string } =>
+    typeof search["edit"] === "string" ? { edit: search["edit"] } : {},
   loader: ({ context }) =>
     Promise.all([context.queryClient.ensureQueryData(periodsQuery), context.queryClient.ensureQueryData(settingsQuery)]),
   component: BillsPage,
@@ -48,6 +50,15 @@ function BillsPage() {
   const { data: settings } = useSuspenseQuery(settingsQuery);
   const [editing, setEditing] = useState<{ p: Period; isNew: boolean } | null>(null);
   const [view, setView] = useState<ViewMode>("cards");
+  const { edit } = Route.useSearch();
+  const navigate = useNavigate();
+  // Deep link from the dashboard: /bills?edit=<period id> opens that period's editor.
+  useEffect(() => {
+    if (!edit) return;
+    const target = allPeriods.find((p) => p.id === edit);
+    if (target) setEditing({ p: target, isNew: false });
+    navigate({ to: "/bills", search: {}, replace: true });
+  }, [edit, allPeriods, navigate]);
   useEffect(() => {
     const v = localStorage.getItem("bills-view");
     if (v === "table" || v === "compare" || v === "calendar") setView(v);
@@ -59,7 +70,7 @@ function BillsPage() {
   };
 
   const createFromCalendar = (start: string, end: string) => {
-    setEditing({ p: { ...newPeriod(latestBefore(allPeriods, start)), start, end }, isNew: true });
+    setEditing({ p: { ...newPeriod(latestBefore(allPeriods, start), settings.vatRate), start, end }, isNew: true });
   };
   const reportYear = view === "calendar" ? calendarYear : year === "all" ? years[0] ?? new Date().getFullYear() : year;
 
@@ -76,7 +87,7 @@ function BillsPage() {
           <Button variant="outline" onClick={() => { if (!exportPdf(allPeriods, settings, reportYear)) toast.error("יש לאפשר חלונות קופצים"); }}>
             <FileText className="h-4 w-4" /> PDF {reportYear}
           </Button>
-          <Button onClick={() => setEditing({ p: newPeriod(latestBefore(allPeriods)), isNew: true })}>
+          <Button onClick={() => setEditing({ p: newPeriod(latestBefore(allPeriods), settings.vatRate), isNew: true })}>
             <Plus className="h-4 w-4" /> תקופה חדשה
           </Button>
         </div>
@@ -204,8 +215,8 @@ function CompareView({ periods, settings }: { periods: Period[]; settings: FullS
       acc.elecA += c.elec.a; acc.elecB += c.elec.b;
       acc.waterA += c.water.a; acc.waterB += c.water.b;
       acc.costA += c.totalA; acc.costB += c.totalB;
-      acc.paidA += p.payA.paid ? p.payA.amount : 0;
-      acc.paidB += p.payB.paid ? p.payB.amount : 0;
+      acc.paidA += paidAmount(p.payA, c.totalA);
+      acc.paidB += paidAmount(p.payB, c.totalB);
       return acc;
     },
     { elecA: 0, elecB: 0, waterA: 0, waterB: 0, costA: 0, costB: 0, paidA: 0, paidB: 0 },
@@ -235,7 +246,7 @@ function CompareView({ periods, settings }: { periods: Period[]; settings: FullS
             <Row label="מים (קוב)" a={String(Math.round(sums.waterA))} b={String(Math.round(sums.waterB))} />
             <Row label="סה״כ חיובים" a={ils(sums.costA)} b={ils(sums.costB)} />
             <Row label="שולם בפועל" a={ils(sums.paidA)} b={ils(sums.paidB)} />
-            <Row label="יתרה פתוחה" a={ils(Math.max(0, sums.costA - sums.paidA))} b={ils(Math.max(0, sums.costB - sums.paidB))} />
+            <Row label="יתרה פתוחה" a={balanceText(sums.costA - sums.paidA)} b={balanceText(sums.costB - sums.paidB)} />
           </tbody>
         </table>
       </div>
@@ -260,6 +271,9 @@ function CompareView({ periods, settings }: { periods: Period[]; settings: FullS
     </div>
   );
 }
+
+/** Positive = still owed; negative = tenant paid more than billed (credit). */
+const balanceText = (n: number) => (n < -0.005 ? `זכות ${ils(-n)}` : ils(Math.max(0, n)));
 
 function TenantChip({ name, total, pay }: { name: string; total: number; pay: Payment }) {
   return (
@@ -291,9 +305,9 @@ function Num({ label, value, onChange }: { label: string; value: number; onChang
   );
 }
 
-function MeterCard({ kind, m, set, settings }: { kind: "elec" | "water"; m: Meter; set: (m: Meter) => void; settings: FullSettings }) {
+function MeterCard({ kind, m, set, settings, vatRate }: { kind: "elec" | "water"; m: Meter; set: (m: Meter) => void; settings: FullSettings; vatRate: number }) {
   const unit = kind === "elec" ? 'קוט"ש' : "קוב";
-  const r = calcMeter(m, settings.vatRate);
+  const r = calcMeter(m, vatRate);
   const u = (k: keyof Meter) => (v: number) => set({ ...m, [k]: v });
   const Icon = kind === "elec" ? Zap : Droplets;
   return (
@@ -316,7 +330,7 @@ function MeterCard({ kind, m, set, settings }: { kind: "elec" | "water"; m: Mete
         <Num label="דמי חיבור/קבוע (₪)" value={m.fixed} onChange={u("fixed")} />
       </div>
       <label className="flex items-center justify-between rounded-xl bg-muted px-3 py-2.5 text-sm">
-        <span>הוספת מע"מ ({settings.vatRate}%)</span>
+        <span>הוספת מע"מ ({vatRate}%)</span>
         <Switch checked={m.vat} onCheckedChange={(v) => set({ ...m, vat: v })} />
       </label>
       {r.b < 0 && <p className="text-sm text-destructive">שימו לב: צריכת דירה א' גבוהה מהמונה הראשי.</p>}
@@ -355,7 +369,7 @@ function PayCard({ name, phone, total, pay, set, text }: { name: string; phone: 
         <Switch
           checked={pay.paid}
           onCheckedChange={(v) =>
-            set({ ...pay, paid: v, amount: v && !pay.amount ? total : pay.amount, date: v && !pay.date ? new Date().toISOString().slice(0, 10) : pay.date })
+            set({ ...pay, paid: v, amount: v && !pay.amount ? total : pay.amount, date: v && !pay.date ? localISO() : pay.date })
           }
         />
       </label>
@@ -388,6 +402,20 @@ function PayCard({ name, phone, total, pay, set, text }: { name: string; phone: 
 function Editor({ initial, isNew, settings, onClose }: { initial: Period; isNew: boolean; settings: FullSettings; onClose: () => void }) {
   const qc = useQueryClient();
   const [p, setP] = useState<Period>(initial);
+  const vatRate = periodVat(p, settings.vatRate);
+  const dirty = isNew || JSON.stringify(p) !== JSON.stringify(initial);
+
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
+  const cancel = () => {
+    if (dirty && !confirm("יש שינויים שלא נשמרו. לצאת בלי לשמור?")) return;
+    onClose();
+  };
   const [busy, setBusy] = useState(false);
   const c = calcPeriod(p, settings.vatRate);
 
@@ -395,7 +423,8 @@ function Editor({ initial, isNew, settings, onClose }: { initial: Period; isNew:
     if (!p.start || !p.end || p.end < p.start) { toast.error("טווח תאריכים לא תקין"); return; }
     setBusy(true);
     try {
-      await savePeriod(p, isNew);
+      // Freeze the VAT rate on save so later changes in settings leave this bill as it was.
+      await savePeriod({ ...p, vatRate }, isNew);
       await qc.invalidateQueries({ queryKey: ["periods"] });
       toast.success("התקופה נשמרה");
       onClose();
@@ -408,25 +437,33 @@ function Editor({ initial, isNew, settings, onClose }: { initial: Period; isNew:
 
   async function remove() {
     if (!confirm("למחוק את התקופה?")) return;
-    await deletePeriod(p.id);
-    await qc.invalidateQueries({ queryKey: ["periods"] });
-    onClose();
+    try {
+      await deletePeriod(p.id);
+      await qc.invalidateQueries({ queryKey: ["periods"] });
+      toast.success("התקופה נמחקה");
+      onClose();
+    } catch {
+      toast.error("המחיקה נכשלה");
+    }
   }
 
   return (
     <div className="space-y-4 pb-24">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">{isNew ? "תקופה חדשה" : "עריכת תקופה"}</h1>
-        <Button variant="ghost" onClick={onClose}>ביטול</Button>
+        <Button variant="ghost" onClick={cancel}>ביטול</Button>
       </div>
 
       <section className="space-y-3 rounded-lg border-b bg-background p-4 text-foreground">
         <PeriodPicker start={p.start} end={p.end} onChange={(start, end) => setP({ ...p, start, end })} />
+        <div className="max-w-48">
+          <Num label='שיעור מע"מ לתקופה זו (%)' value={vatRate} onChange={(n) => setP({ ...p, vatRate: n })} />
+        </div>
       </section>
 
       <div className="grid items-start gap-4 lg:grid-cols-2">
-        <MeterCard kind="elec" m={p.elec} set={(elec) => setP({ ...p, elec })} settings={settings} />
-        <MeterCard kind="water" m={p.water} set={(water) => setP({ ...p, water })} settings={settings} />
+        <MeterCard kind="elec" m={p.elec} set={(elec) => setP({ ...p, elec })} settings={settings} vatRate={vatRate} />
+        <MeterCard kind="water" m={p.water} set={(water) => setP({ ...p, water })} settings={settings} vatRate={vatRate} />
       </div>
 
       <h2 className="pt-2 text-lg font-bold">תשלומים ושליחה</h2>

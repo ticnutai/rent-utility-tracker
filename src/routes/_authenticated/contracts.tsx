@@ -44,7 +44,8 @@ const blank = (apartment: "a" | "b"): Contract => ({
 
 function daysLeft(end: string | null) {
   if (!end) return null;
-  return Math.ceil((new Date(end).getTime() - Date.now()) / 86400000);
+  // Parse as local midnight; a bare YYYY-MM-DD is read as UTC and shifts by the timezone offset.
+  return Math.ceil((new Date(`${end}T00:00:00`).getTime() - Date.now()) / 86400000);
 }
 
 function ContractsPage() {
@@ -148,6 +149,7 @@ function ContractForm({ initial, onDone }: { initial: Contract; onDone: () => vo
 
   async function save() {
     setBusy(true);
+    let uploaded: string | null = null;
     try {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) throw new Error();
@@ -157,7 +159,7 @@ function ContractForm({ initial, onDone }: { initial: Contract; onDone: () => vo
         const path = `${u.user.id}/${crypto.randomUUID()}.${ext}`;
         const { error } = await supabase.storage.from("contracts").upload(path, file);
         if (error) throw error;
-        if (c.file_path) await supabase.storage.from("contracts").remove([c.file_path]);
+        uploaded = path;
         file_path = path;
         file_name = file.name;
       }
@@ -167,10 +169,13 @@ function ContractForm({ initial, onDone }: { initial: Contract; onDone: () => vo
         ? await supabase.from("contracts").update(row).eq("id", id)
         : await supabase.from("contracts").insert(row);
       if (error) throw error;
+      // Remove the replaced file only once the row points at the new one.
+      if (uploaded && c.file_path) await supabase.storage.from("contracts").remove([c.file_path]);
       await qc.invalidateQueries({ queryKey: ["contracts"] });
       toast.success("החוזה נשמר");
       onDone();
     } catch {
+      if (uploaded) await supabase.storage.from("contracts").remove([uploaded]);
       toast.error("השמירה נכשלה");
     } finally {
       setBusy(false);
@@ -179,9 +184,11 @@ function ContractForm({ initial, onDone }: { initial: Contract; onDone: () => vo
 
   async function remove() {
     if (!confirm("למחוק את החוזה?")) return;
+    const { error } = await supabase.from("contracts").delete().eq("id", c.id);
+    if (error) { toast.error("המחיקה נכשלה"); return; }
     if (c.file_path) await supabase.storage.from("contracts").remove([c.file_path]);
-    await supabase.from("contracts").delete().eq("id", c.id);
     await qc.invalidateQueries({ queryKey: ["contracts"] });
+    toast.success("החוזה נמחק");
     onDone();
   }
 

@@ -4,7 +4,7 @@ import { AlertTriangle, CheckCircle2, Clock, Wallet, Zap, Droplets, CalendarX } 
 import { missingMonths } from "@/lib/report";
 import { HE_MONTHS } from "@/lib/periodLabel";
 import { periodsQuery, settingsQuery } from "@/lib/data";
-import { calcPeriod, fmtDate, ils, type Period, type Payment } from "@/lib/billing";
+import { calcPeriod, fmtDate, ils, localISO, paidAmount, type Period, type Payment } from "@/lib/billing";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -37,16 +37,16 @@ function DashboardPage() {
   const { data: periods } = useSuspenseQuery(periodsQuery);
   const { data: settings } = useSuspenseQuery(settingsQuery);
 
-  const today = new Date().toISOString().slice(0, 10);
-  const lateCutoff = new Date(Date.now() - LATE_DAYS * 86400000).toISOString().slice(0, 10);
+  const lateCutoff = localISO(new Date(Date.now() - LATE_DAYS * 86400000));
 
   const rows: Row[] = periods.flatMap((p) => {
     const c = calcPeriod(p, settings.vatRate);
     return (["a", "b"] as const).map((who) => {
       const total = who === "a" ? c.totalA : c.totalB;
       const pay = who === "a" ? p.payA : p.payB;
-      const balance = pay.paid ? Math.max(0, total - pay.amount) : total;
-      return { period: p, who, total, pay, balance, late: !pay.paid && p.end < lateCutoff };
+      const balance = Math.max(0, total - paidAmount(pay, total));
+      // A partial payment still leaves the remainder overdue.
+      return { period: p, who, total, pay, balance, late: balance > 0.005 && p.end < lateCutoff };
     });
   });
 
@@ -146,6 +146,7 @@ function DashboardPage() {
             <Link
               key={`${r.period.id}-${r.who}`}
               to="/bills"
+              search={{ edit: r.period.id }}
               className="block rounded-2xl border bg-card p-4 transition-colors hover:bg-accent/40"
             >
               <div className="flex items-center justify-between">
