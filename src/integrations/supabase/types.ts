@@ -65,6 +65,51 @@ export type Database = {
         }
         Relationships: []
       }
+      migration_admins: {
+        Row: {
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      migration_runner_logs: {
+        Row: {
+          error: string | null
+          executed_at: string
+          executed_by: string | null
+          id: string
+          name: string
+          statements_count: number
+          success: boolean
+        }
+        Insert: {
+          error?: string | null
+          executed_at?: string
+          executed_by?: string | null
+          id?: string
+          name: string
+          statements_count?: number
+          success?: boolean
+        }
+        Update: {
+          error?: string | null
+          executed_at?: string
+          executed_by?: string | null
+          id?: string
+          name?: string
+          statements_count?: number
+          success?: boolean
+        }
+        Relationships: []
+      }
       periods: {
         Row: {
           created_at: string
@@ -130,7 +175,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      am_i_migration_admin: { Args: never; Returns: boolean }
+      execute_admin_migration: {
+        Args: { p_name: string; p_statements: string[] }
+        Returns: Json
+      }
+      get_migration_history: {
+        Args: never
+        Returns: {
+          error: string
+          executed_at: string
+          id: string
+          name: string
+          statements_count: number
+          success: boolean
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
