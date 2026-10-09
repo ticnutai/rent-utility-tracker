@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router";
-import { Receipt, FileText, Settings as SettingsIcon } from "lucide-react";
+import { LayoutDashboard, Receipt, FileText, Settings as SettingsIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated")({
@@ -12,6 +12,7 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 const tabs = [
+  { to: "/dashboard", label: "ראשי", icon: LayoutDashboard },
   { to: "/bills", label: "חשבונות", icon: Receipt },
   { to: "/contracts", label: "דיירים וחוזים", icon: FileText },
   { to: "/settings", label: "הגדרות", icon: SettingsIcon },
