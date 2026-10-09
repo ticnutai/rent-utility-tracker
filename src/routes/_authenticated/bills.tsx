@@ -192,7 +192,7 @@ function Editor({ initial, isNew, settings, onClose }: { initial: Period; isNew:
   const c = calcPeriod(p, settings.vatRate);
 
   async function save() {
-    if (!p.start || !p.end || p.end < p.start) return toast.error("טווח תאריכים לא תקין");
+    if (!p.start || !p.end || p.end < p.start) { toast.error("טווח תאריכים לא תקין"); return; }
     setBusy(true);
     try {
       await savePeriod(p, isNew);

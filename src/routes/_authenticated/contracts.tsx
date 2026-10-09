@@ -49,7 +49,7 @@ function ContractsPage() {
 
   async function openFile(path: string) {
     const { data, error } = await supabase.storage.from("contracts").createSignedUrl(path, 300);
-    if (error || !data) return toast.error("לא ניתן לפתוח את הקובץ");
+    if (error || !data) { toast.error("לא ניתן לפתוח את הקובץ"); return; }
     window.open(data.signedUrl, "_blank");
   }
 
