@@ -6,6 +6,7 @@ import { HE_MONTHS, monthRange, rangesOverlap, type PeriodMode } from "@/lib/per
 import { calcPeriod, ils, type Period } from "@/lib/billing";
 import type { FullSettings } from "@/lib/data";
 import { PeriodTitle } from "@/components/PeriodPicker";
+import { missingMonths } from "@/lib/report";
 
 const weekdays = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
 
@@ -18,6 +19,7 @@ export function BillsCalendar({ periods, settings, year, onYearChange, onEdit, o
   onCreate: (start: string, end: string) => void;
 }) {
   const [mode, setMode] = useState<PeriodMode>("single");
+  const missing = missingMonths(periods, year);
   const selectMonth = (month: number) => {
     const range = monthRange(year, mode === "bi" ? Math.floor(month / 2) * 2 : month, mode === "bi" ? 2 : 1);
     const existing = periods.find((p) => p.start === range.start && p.end === range.end);
@@ -40,16 +42,19 @@ export function BillsCalendar({ periods, settings, year, onYearChange, onEdit, o
           ))}
         </div>
       </div>
+      {missing.length > 0 && <p className="rounded-lg bg-destructive px-3 py-2 text-sm text-destructive-foreground">חסר חשבון ב-{missing.length} חודשים: {missing.map((m) => HE_MONTHS[m]).join(", ")}</p>}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {HE_MONTHS.map((name, month) => {
           const range = monthRange(year, month, 1);
           const entries = periods.filter((p) => rangesOverlap(p.start, p.end, range.start, range.end));
           const days = new Date(year, month + 1, 0).getDate();
           const offset = new Date(year, month, 1).getDay();
+          const isMissing = missing.includes(month);
           return (
-            <article key={month} className="min-w-0 rounded-lg border bg-card p-3 text-card-foreground" aria-label={`${name} ${year}`}>
-              <div className="mb-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+            <article key={month} className={`min-w-0 rounded-lg border bg-card p-3 text-card-foreground ${isMissing ? "border-2 border-destructive" : ""}`} aria-label={`${name} ${year}`}>
+              <div className="mb-3 grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2">
                 <Button variant="ghost" className="justify-start px-1 text-base font-bold" onClick={() => selectMonth(month)} aria-label={`פתיחת ${name} ${year}`}>{name}</Button>
+                {isMissing ? <span className="rounded bg-destructive px-2 py-0.5 text-xs text-destructive-foreground">חסר חשבון</span> : <span />}
                 <Button variant="ghost" size="icon" aria-label={`הוספת תקופה ${name} ${year}`} title={`הוספת תקופה ${name}`} onClick={() => { const r = monthRange(year, mode === "bi" ? Math.floor(month / 2) * 2 : month, mode === "bi" ? 2 : 1); onCreate(r.start, mode === "custom" ? r.start : r.end); }}><Plus /></Button>
               </div>
               <div className="grid grid-cols-7 text-center text-xs text-muted-foreground">{weekdays.map((day) => <span key={day} className="pb-2">{day}</span>)}</div>
