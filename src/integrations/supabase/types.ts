@@ -14,7 +14,117 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      contracts: {
+        Row: {
+          apartment: string
+          created_at: string
+          end_date: string | null
+          file_name: string | null
+          file_path: string | null
+          id: string
+          monthly_rent: number
+          notes: string
+          option_months: number
+          option_rent: number
+          start_date: string | null
+          tenant_name: string
+          tenant_phone: string
+          user_id: string
+        }
+        Insert: {
+          apartment?: string
+          created_at?: string
+          end_date?: string | null
+          file_name?: string | null
+          file_path?: string | null
+          id?: string
+          monthly_rent?: number
+          notes?: string
+          option_months?: number
+          option_rent?: number
+          start_date?: string | null
+          tenant_name?: string
+          tenant_phone?: string
+          user_id?: string
+        }
+        Update: {
+          apartment?: string
+          created_at?: string
+          end_date?: string | null
+          file_name?: string | null
+          file_path?: string | null
+          id?: string
+          monthly_rent?: number
+          notes?: string
+          option_months?: number
+          option_rent?: number
+          start_date?: string | null
+          tenant_name?: string
+          tenant_phone?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      periods: {
+        Row: {
+          created_at: string
+          data: Json
+          end_date: string
+          id: string
+          start_date: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data?: Json
+          end_date: string
+          id?: string
+          start_date: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          end_date?: string
+          id?: string
+          start_date?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      settings: {
+        Row: {
+          name_a: string
+          name_b: string
+          phone_a: string
+          phone_b: string
+          updated_at: string
+          user_id: string
+          vat_rate: number
+        }
+        Insert: {
+          name_a?: string
+          name_b?: string
+          phone_a?: string
+          phone_b?: string
+          updated_at?: string
+          user_id: string
+          vat_rate?: number
+        }
+        Update: {
+          name_a?: string
+          name_b?: string
+          phone_a?: string
+          phone_b?: string
+          updated_at?: string
+          user_id?: string
+          vat_rate?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
