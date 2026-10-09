@@ -19,9 +19,22 @@ export async function activeOwnerId(): Promise<string> {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) throw new Error("לא מחובר");
   const stored = typeof window === "undefined" ? null : localStorage.getItem(OWNER_KEY);
-  if (stored && stored !== u.user.id) {
+  if (stored === u.user.id) return stored;
+  if (stored) {
     const { data } = await supabase.from("account_members").select("id").eq("owner_id", stored).limit(1);
     if (data?.length) return stored;
+  }
+  // No explicit choice yet: a partner lands on the account they were invited to, not on their empty own one.
+  const email = (u.user.email ?? "").toLowerCase();
+  if (email) {
+    const { data } = await supabase
+      .from("account_members")
+      .select("owner_id")
+      .eq("member_email", email)
+      .neq("owner_id", u.user.id)
+      .order("created_at")
+      .limit(1);
+    if (data?.[0]) return data[0].owner_id;
   }
   return u.user.id;
 }
