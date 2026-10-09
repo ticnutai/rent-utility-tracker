@@ -7,6 +7,8 @@ import { saveSettings, settingsQuery, type FullSettings } from "@/lib/data";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { applyTheme, getStoredMode, getStoredTheme, THEMES, type ThemeId, type ThemeMode } from "@/lib/theme";
+import { Moon, Sun } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({ meta: [{ title: "הגדרות — ניהול דירות" }] }),
