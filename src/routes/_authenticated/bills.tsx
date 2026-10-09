@@ -369,13 +369,6 @@ function Editor({ initial, isNew, settings, onClose }: { initial: Period; isNew:
     onClose();
   }
 
-  const setMonths = (n: number) => {
-    const s = new Date(p.start || new Date());
-    const e = new Date(s);
-    e.setMonth(e.getMonth() + n);
-    setP({ ...p, end: e.toISOString().slice(0, 10) });
-  };
-
   return (
     <div className="space-y-4 pb-24">
       <div className="flex items-center justify-between">
@@ -384,20 +377,7 @@ function Editor({ initial, isNew, settings, onClose }: { initial: Period; isNew:
       </div>
 
       <section className="space-y-3 rounded-2xl border bg-card p-4">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">מתאריך</Label>
-            <Input type="date" className="h-11" value={p.start} onChange={(e) => setP({ ...p, start: e.target.value })} />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">עד תאריך</Label>
-            <Input type="date" className="h-11" value={p.end} onChange={(e) => setP({ ...p, end: e.target.value })} />
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => setMonths(1)}>חודש</Button>
-          <Button size="sm" variant="outline" onClick={() => setMonths(2)}>חודשיים</Button>
-        </div>
+        <PeriodPicker start={p.start} end={p.end} onChange={(start, end) => setP({ ...p, start, end })} />
       </section>
 
       <MeterCard kind="elec" m={p.elec} set={(elec) => setP({ ...p, elec })} settings={settings} />
