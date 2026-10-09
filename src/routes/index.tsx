@@ -9,6 +9,8 @@ export const Route = createFileRoute("/")({
       { name: "description", content: "חישוב חשבונות חשמל ומים לשתי דירות, מעקב תשלומים, סיכום לוואטסאפ וניהול חוזים." },
       { property: "og:title", content: "ניהול דירות — חשמל, מים וחוזים" },
       { property: "og:description", content: "חישוב חשבונות חשמל ומים לשתי דירות, מעקב תשלומים וניהול חוזים." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: Index,
