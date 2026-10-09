@@ -30,10 +30,11 @@ function BillsPage() {
   const { data: periods } = useSuspenseQuery(periodsQuery);
   const { data: settings } = useSuspenseQuery(settingsQuery);
   const [editing, setEditing] = useState<{ p: Period; isNew: boolean } | null>(null);
-  const [view, setView] = useState<ViewMode>(() => {
+  const [view, setView] = useState<ViewMode>("cards");
+  useEffect(() => {
     const v = localStorage.getItem("bills-view");
-    return v === "table" || v === "compare" ? v : "cards";
-  });
+    if (v === "table" || v === "compare") setView(v);
+  }, []);
 
   const pick = (v: ViewMode) => {
     setView(v);
