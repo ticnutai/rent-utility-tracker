@@ -14,7 +14,14 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 export const Route = createFileRoute("/_authenticated/contracts")({
-  head: () => ({ meta: [{ title: "דיירים וחוזים — ניהול דירות" }] }),
+  head: () => ({ meta: [
+    { title: "דיירים וחוזים — ניהול דירות" },
+    { name: "description", content: "ניהול חוזי שכירות, פרטי דיירים וקובצי חוזים לשתי הדירות." },
+    { property: "og:title", content: "דיירים וחוזים — ניהול דירות" },
+    { property: "og:description", content: "ניהול חוזי שכירות, פרטי דיירים וקובצי חוזים לשתי הדירות." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   loader: ({ context }) =>
     Promise.all([context.queryClient.ensureQueryData(contractsQuery), context.queryClient.ensureQueryData(settingsQuery)]),
   component: ContractsPage,

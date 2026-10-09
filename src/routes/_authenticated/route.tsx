@@ -20,12 +20,12 @@ const tabs = [
 
 function AppLayout() {
   return (
-    <div className="min-h-screen bg-background pb-24">
-      <main className="mx-auto max-w-2xl px-4 pt-5">
+    <div className="min-h-screen bg-background pb-24 text-foreground">
+      <main className="w-full min-w-0 px-4 pt-5 sm:px-6 lg:px-10 lg:pt-8">
         <Outlet />
       </main>
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-card/95 backdrop-blur">
-        <div className="mx-auto flex max-w-2xl">
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-card/95 text-card-foreground backdrop-blur">
+        <div className="grid w-full grid-cols-4 px-2 sm:px-6 lg:px-10">
           {tabs.map((t) => (
             <Link
               key={t.to}

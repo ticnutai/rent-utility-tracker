@@ -12,8 +12,34 @@ export function monthRange(year: number, month: number, count: 1 | 2): { start: 
 }
 
 function parts(s: string) {
-  const [y, m, d] = s.split("-").map(Number);
-  return { y: y!, m: m! - 1, d: d! };
+  const [y = 0, m = 1, d = 1] = s.split("-").map(Number);
+  return { y, m: m - 1, d };
+}
+
+export type PeriodMode = "single" | "bi" | "custom";
+
+export function detectPeriodMode(start: string, end: string): PeriodMode {
+  const label = periodLabel(start, end);
+  return label ? (label.includes("–") ? "bi" : "single") : "custom";
+}
+
+/** Custom ranges advance by their inclusive day count; calendar ranges by one/two months. */
+export function shiftPeriod(start: string, end: string, mode: PeriodMode, direction: -1 | 1) {
+  if (!start || !end || end < start) return { start, end };
+  const s = parts(start);
+  if (mode !== "custom") {
+    const date = new Date(s.y, s.m + direction * (mode === "bi" ? 2 : 1), 1);
+    return monthRange(date.getFullYear(), date.getMonth(), mode === "bi" ? 2 : 1);
+  }
+  const first = Date.parse(`${start}T00:00:00Z`);
+  const last = Date.parse(`${end}T00:00:00Z`);
+  if (!Number.isFinite(first) || !Number.isFinite(last)) return { start, end };
+  const offset = direction * (last - first + 86400000);
+  return { start: new Date(first + offset).toISOString().slice(0, 10), end: new Date(last + offset).toISOString().slice(0, 10) };
+}
+
+export function rangesOverlap(start: string, end: string, from: string, to: string) {
+  return start <= to && end >= from;
 }
 
 /** Hebrew label: "ספטמבר 2026", "יולי–אוגוסט 2026", "דצמבר 2025–ינואר 2026", or null for partial months. */

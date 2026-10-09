@@ -11,6 +11,8 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
       { name: "description", content: "יתרות פתוחות, תשלומים באיחור ומצב החשבונות של שתי הדירות." },
       { property: "og:title", content: "ראשי — ניהול דירות" },
       { property: "og:description", content: "יתרות פתוחות, תשלומים באיחור ומצב החשבונות של שתי הדירות." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   loader: ({ context }) =>
@@ -156,7 +158,8 @@ function DashboardPage() {
           </div>
         ) : (
           (() => {
-            const p = periods[0]!;
+            const p = periods[0];
+            if (!p) return null;
             const c = calcPeriod(p, settings.vatRate);
             return (
               <div className="rounded-2xl border bg-card p-4">

@@ -11,7 +11,14 @@ import { applyTheme, getStoredMode, getStoredTheme, THEMES, type ThemeId, type T
 import { Moon, Sun } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/settings")({
-  head: () => ({ meta: [{ title: "הגדרות — ניהול דירות" }] }),
+  head: () => ({ meta: [
+    { title: "הגדרות — ניהול דירות" },
+    { name: "description", content: "הגדרות דיירים, מע״מ וערכות צבע לניהול חשבונות הדירות." },
+    { property: "og:title", content: "הגדרות — ניהול דירות" },
+    { property: "og:description", content: "הגדרות דיירים, מע״מ וערכות צבע לניהול חשבונות הדירות." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   loader: ({ context }) => context.queryClient.ensureQueryData(settingsQuery),
   component: SettingsPage,
 });

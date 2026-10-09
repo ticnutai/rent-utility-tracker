@@ -14,6 +14,8 @@ export const Route = createFileRoute("/auth")({
       { name: "description", content: "כניסה למערכת ניהול חשבונות חשמל, מים וחוזים לדירות." },
       { property: "og:title", content: "כניסה — ניהול דירות" },
       { property: "og:description", content: "כניסה למערכת ניהול חשבונות חשמל, מים וחוזים לדירות." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: AuthPage,

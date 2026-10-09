@@ -2,9 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { PeriodPicker, PeriodTitle } from "@/components/PeriodPicker";
+import { BillsCalendar } from "@/components/BillsCalendar";
 import { periodYear } from "@/lib/periodLabel";
 import { toast } from "sonner";
-import { Plus, Zap, Droplets, Copy, MessageCircle, Trash2, ChevronLeft, Check, Clock, LayoutGrid, Table2, Scale } from "lucide-react";
+import { Plus, Zap, Droplets, Copy, MessageCircle, Trash2, ChevronLeft, Check, Clock, LayoutGrid, Table2, Scale, CalendarDays } from "lucide-react";
 import { periodsQuery, savePeriod, deletePeriod, settingsQuery, type FullSettings } from "@/lib/data";
 import { calcPeriod, calcMeter, newPeriod, fmtDate, ils, summaryText, type Period, type Meter, type Payment } from "@/lib/billing";
 import { Button } from "@/components/ui/button";
@@ -14,31 +15,40 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
 export const Route = createFileRoute("/_authenticated/bills")({
-  head: () => ({ meta: [{ title: "חשבונות — ניהול דירות" }] }),
+  head: () => ({ meta: [
+    { title: "חשבונות ולוח שנה — ניהול דירות" },
+    { name: "description", content: "ניהול תקופות חשמל ומים, לוח שנה שנתי, תשלומים והשוואה בין שתי הדירות." },
+    { property: "og:title", content: "חשבונות ולוח שנה — ניהול דירות" },
+    { property: "og:description", content: "חשבונות, תקופות ותשלומים לשתי דירות בתצוגת לוח שנה, כרטיסים וטבלה." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   loader: ({ context }) =>
     Promise.all([context.queryClient.ensureQueryData(periodsQuery), context.queryClient.ensureQueryData(settingsQuery)]),
   component: BillsPage,
 });
 
-type ViewMode = "cards" | "table" | "compare";
+type ViewMode = "cards" | "table" | "compare" | "calendar";
 
 const viewModes: { id: ViewMode; label: string; icon: typeof LayoutGrid }[] = [
   { id: "cards", label: "כרטיסים", icon: LayoutGrid },
   { id: "table", label: "טבלה", icon: Table2 },
   { id: "compare", label: "השוואה", icon: Scale },
+  { id: "calendar", label: "לוח שנה", icon: CalendarDays },
 ];
 
 function BillsPage() {
   const { data: allPeriods } = useSuspenseQuery(periodsQuery);
   const years = [...new Set(allPeriods.map((p) => periodYear(p.start)))].sort((a, b) => b - a);
   const [year, setYear] = useState<number | "all">("all");
+  const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
   const periods = year === "all" ? allPeriods : allPeriods.filter((p) => periodYear(p.start) === year);
   const { data: settings } = useSuspenseQuery(settingsQuery);
   const [editing, setEditing] = useState<{ p: Period; isNew: boolean } | null>(null);
   const [view, setView] = useState<ViewMode>("cards");
   useEffect(() => {
     const v = localStorage.getItem("bills-view");
-    if (v === "table" || v === "compare") setView(v);
+    if (v === "table" || v === "compare" || v === "calendar") setView(v);
   }, []);
 
   const pick = (v: ViewMode) => {
@@ -46,58 +56,65 @@ function BillsPage() {
     localStorage.setItem("bills-view", v);
   };
 
+  const createFromCalendar = (start: string, end: string) => {
+    const previous = allPeriods.filter((p) => p.end < start).sort((a, b) => b.end.localeCompare(a.end))[0];
+    setEditing({ p: { ...newPeriod(previous), start, end }, isNew: true });
+  };
+
   if (editing) return <Editor initial={editing.p} isNew={editing.isNew} settings={settings} onClose={() => setEditing(null)} />;
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">חשבונות</h1>
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 sm:flex sm:justify-between">
+        <h1 className="min-w-0 truncate text-2xl font-bold">חשבונות</h1>
         <Button onClick={() => setEditing({ p: newPeriod(periods[0]), isNew: true })}>
           <Plus className="h-4 w-4" /> תקופה חדשה
         </Button>
       </div>
 
-      <div className="grid grid-cols-3 gap-1 rounded-xl bg-muted p-1">
+      <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1 text-muted-foreground sm:grid-cols-4">
         {viewModes.map((m) => (
-          <button
+          <Button
             key={m.id}
+            variant="ghost"
+            aria-pressed={view === m.id}
             onClick={() => pick(m.id)}
             className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-sm transition-colors ${
-              view === m.id ? "bg-card font-semibold shadow-sm" : "text-muted-foreground"
+              view === m.id ? "bg-card text-card-foreground font-semibold shadow-sm" : "text-muted-foreground"
             }`}
           >
             <m.icon className="h-4 w-4" /> {m.label}
-          </button>
+          </Button>
         ))}
       </div>
 
-      {years.length > 1 && (
+      {view !== "calendar" && years.length > 1 && (
         <div className="flex gap-2 overflow-x-auto pb-1">
           {(["all", ...years] as const).map((y) => (
-            <button key={y} onClick={() => setYear(y)}
+            <Button key={y} variant="outline" aria-pressed={year === y} onClick={() => setYear(y)}
               className={`shrink-0 rounded-full border px-4 py-1.5 text-sm transition-colors ${year === y ? "border-primary bg-primary text-primary-foreground" : "bg-card text-foreground"}`}>
               {y === "all" ? "הכול" : y}
-            </button>
+            </Button>
           ))}
         </div>
       )}
 
-      {periods.length === 0 && (
+      {view !== "calendar" && periods.length === 0 && (
         <div className="rounded-2xl border border-dashed bg-card p-8 text-center text-muted-foreground">
           עדיין אין תקופות. אפשר להוסיף גם תקופות מהעבר.
         </div>
       )}
 
-      {view === "cards" &&
-        periods.map((p) => {
+      {view === "cards" && <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {periods.map((p) => {
           const c = calcPeriod(p, settings.vatRate);
           return (
-            <button
+            <Button variant="ghost"
               key={p.id}
               onClick={() => setEditing({ p, isNew: false })}
-              className="w-full rounded-2xl border bg-card p-4 text-start shadow-sm transition-colors hover:bg-accent/40"
+              className="block h-auto w-full min-w-0 whitespace-normal rounded-lg border bg-card p-4 text-start text-card-foreground shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
             >
-              <div className="flex items-center justify-between">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
                 <PeriodTitle start={p.start} end={p.end} />
                 <ChevronLeft className="h-4 w-4 text-muted-foreground" />
               </div>
@@ -105,12 +122,13 @@ function BillsPage() {
                 <TenantChip name={settings.nameA} total={c.totalA} pay={p.payA} />
                 <TenantChip name={settings.nameB} total={c.totalB} pay={p.payB} />
               </div>
-            </button>
+            </Button>
           );
-        })}
+        })}</div>}
 
       {view === "table" && <TableView periods={periods} settings={settings} onEdit={(p) => setEditing({ p, isNew: false })} />}
       {view === "compare" && <CompareView periods={periods} settings={settings} />}
+      {view === "calendar" && <BillsCalendar periods={allPeriods} settings={settings} year={calendarYear} onYearChange={setCalendarYear} onEdit={(p) => setEditing({ p, isNew: false })} onCreate={createFromCalendar} />}
     </div>
   );
 }
@@ -392,16 +410,20 @@ function Editor({ initial, isNew, settings, onClose }: { initial: Period; isNew:
         <Button variant="ghost" onClick={onClose}>ביטול</Button>
       </div>
 
-      <section className="space-y-3 rounded-2xl border bg-card p-4">
+      <section className="space-y-3 rounded-lg border-b bg-background p-4 text-foreground">
         <PeriodPicker start={p.start} end={p.end} onChange={(start, end) => setP({ ...p, start, end })} />
       </section>
 
-      <MeterCard kind="elec" m={p.elec} set={(elec) => setP({ ...p, elec })} settings={settings} />
-      <MeterCard kind="water" m={p.water} set={(water) => setP({ ...p, water })} settings={settings} />
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        <MeterCard kind="elec" m={p.elec} set={(elec) => setP({ ...p, elec })} settings={settings} />
+        <MeterCard kind="water" m={p.water} set={(water) => setP({ ...p, water })} settings={settings} />
+      </div>
 
       <h2 className="pt-2 text-lg font-bold">תשלומים ושליחה</h2>
-      <PayCard name={settings.nameA} phone={settings.phoneA} total={c.totalA} pay={p.payA} set={(payA) => setP({ ...p, payA })} text={summaryText(p, settings, "a")} />
-      <PayCard name={settings.nameB} phone={settings.phoneB} total={c.totalB} pay={p.payB} set={(payB) => setP({ ...p, payB })} text={summaryText(p, settings, "b")} />
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        <PayCard name={settings.nameA} phone={settings.phoneA} total={c.totalA} pay={p.payA} set={(payA) => setP({ ...p, payA })} text={summaryText(p, settings, "a")} />
+        <PayCard name={settings.nameB} phone={settings.phoneB} total={c.totalB} pay={p.payB} set={(payB) => setP({ ...p, payB })} text={summaryText(p, settings, "b")} />
+      </div>
 
       {!isNew && (
         <Button variant="ghost" className="w-full text-destructive" onClick={remove}>
@@ -409,8 +431,8 @@ function Editor({ initial, isNew, settings, onClose }: { initial: Period; isNew:
         </Button>
       )}
 
-      <div className="fixed inset-x-0 bottom-[68px] z-30 border-t bg-card/95 p-3 backdrop-blur">
-        <div className="mx-auto max-w-2xl">
+      <div className="fixed inset-x-0 bottom-[68px] z-30 border-t bg-card/95 p-3 text-card-foreground backdrop-blur sm:px-6 lg:px-10">
+        <div className="w-full">
           <Button className="h-12 w-full text-base" onClick={save} disabled={busy}>
             שמירה
           </Button>
