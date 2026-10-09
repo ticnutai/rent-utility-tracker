@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Plus, Zap, Droplets, Copy, MessageCircle, Trash2, ChevronLeft, Check, Clock, LayoutGrid, Table2, Scale } from "lucide-react";
 import { periodsQuery, savePeriod, deletePeriod, settingsQuery, type FullSettings } from "@/lib/data";
@@ -30,10 +30,11 @@ function BillsPage() {
   const { data: periods } = useSuspenseQuery(periodsQuery);
   const { data: settings } = useSuspenseQuery(settingsQuery);
   const [editing, setEditing] = useState<{ p: Period; isNew: boolean } | null>(null);
-  const [view, setView] = useState<ViewMode>(() => {
+  const [view, setView] = useState<ViewMode>("cards");
+  useEffect(() => {
     const v = localStorage.getItem("bills-view");
-    return v === "table" || v === "compare" ? v : "cards";
-  });
+    if (v === "table" || v === "compare") setView(v);
+  }, []);
 
   const pick = (v: ViewMode) => {
     setView(v);
