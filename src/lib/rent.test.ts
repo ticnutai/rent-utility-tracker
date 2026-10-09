@@ -1,17 +1,21 @@
 import { describe, expect, it } from "vitest";
 import type { Contract } from "./data";
-import { contractForMonth, expiringContracts, openRent, rentMonth, rentReminderText, rentYear, type RentPayment } from "./rent";
+import { contractForMonth, effectiveEnd, expiringContracts, openRent, rentMonth, rentReminderText, rentYear, type RentPayment } from "./rent";
 
 const contract = (over: Partial<Contract> = {}): Contract => ({
   id: "c1",
   apartment: "a",
   tenant_name: "דייר",
   tenant_phone: "",
+  tenant_id_number: "",
+  landlord_name: "",
+  landlord_id_number: "",
   start_date: "2026-01-01",
   end_date: "2026-06-30",
   monthly_rent: 4000,
   option_months: 3,
   option_rent: 4200,
+  option_exercised: false,
   notes: "",
   file_path: null,
   file_name: null,
@@ -64,6 +68,9 @@ describe("rentMonth", () => {
   it("option months are not owed until a payment is recorded", () => {
     expect(rentMonth([contract()], [], "a", "2026-08-01", today)).toMatchObject({ status: "option", balance: 0 });
   });
+  it("an exercised option is owed like a regular month, at the option rent", () => {
+    expect(rentMonth([contract({ option_exercised: true })], [], "a", "2026-08-01", today)).toMatchObject({ status: "late", balance: 4200 });
+  });
   it("a recorded month keeps its own amount due", () => {
     const r = rentMonth([contract({ monthly_rent: 5000 })], [pay({ paid: false, amount_due: 4000 })], "a", "2026-03-01", today);
     expect(r.due).toBe(4000);
@@ -90,5 +97,10 @@ describe("expiringContracts", () => {
       today,
     );
     expect(list.map((e) => [e.contract.id, e.daysLeft])).toEqual([["y", 11], ["x", 52]]);
+  });
+  it("an exercised option moves the end to the option's end", () => {
+    const c = contract({ end_date: "2026-10-31", option_months: 12, option_exercised: true });
+    expect(effectiveEnd(c)).toBe("2027-10-31");
+    expect(expiringContracts([c], today)).toEqual([]);
   });
 });

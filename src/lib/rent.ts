@@ -54,6 +54,12 @@ const addMonths = (iso: string, n: number) => {
   return localISO(new Date(y, m + n, d));
 };
 
+/** Last day the tenant is committed to: the option's end once it was exercised, else the contract end. */
+export function effectiveEnd(c: Contract) {
+  if (!c.end_date) return null;
+  return c.option_exercised && c.option_months > 0 ? addMonths(c.end_date, c.option_months) : c.end_date;
+}
+
 /** The contract covering a month for an apartment, and whether the month falls in its option period. */
 export function contractForMonth(contracts: Contract[], apt: Apartment, month: string) {
   const last = monthEnd(month);
@@ -85,7 +91,8 @@ export function rentMonth(contracts: Contract[], payments: RentPayment[], apt: A
   const balance = Math.max(0, Math.round((due - paidAmount) * 100) / 100);
   if (balance <= 0.005 && payment) return settle("paid");
   if (month > now) return settle("future");
-  if (match?.inOption && !payment) return settle("option");
+  // An option the tenant hasn't (yet) taken is only owed once a payment is recorded.
+  if (match?.inOption && !match.contract.option_exercised && !payment) return settle("option");
   if (balance <= 0.005) return settle("paid");
   const lateFrom = `${month.slice(0, 8)}${pad(RENT_LATE_DAYS + 1)}`;
   const status: RentStatus = paidAmount > 0 ? "partial" : now >= lateFrom ? "late" : "open";
@@ -132,15 +139,17 @@ export function rentReminderText(name: string, months: RentMonth[]) {
   ].join("\n");
 }
 
-/** Contracts ending within `days` days (or already in their last days), soonest first. */
+/** Contracts ending within `days` days (an exercised option counts as the end), soonest first. */
 export function expiringContracts(contracts: Contract[], today = new Date(), days = 60) {
   const now = localISO(today);
   const limit = localISO(new Date(today.getFullYear(), today.getMonth(), today.getDate() + days));
   return contracts
-    .filter((c) => c.end_date && c.end_date >= now && c.end_date <= limit)
-    .map((c) => ({
-      contract: c,
-      daysLeft: Math.round((Date.parse(`${c.end_date}T00:00:00`) - Date.parse(`${now}T00:00:00`)) / 86400000),
+    .map((c) => ({ contract: c, end: effectiveEnd(c) }))
+    .filter((x): x is { contract: Contract; end: string } => !!x.end && x.end >= now && x.end <= limit)
+    .map(({ contract, end }) => ({
+      contract,
+      end,
+      daysLeft: Math.round((Date.parse(`${end}T00:00:00`) - Date.parse(`${now}T00:00:00`)) / 86400000),
     }))
     .sort((a, b) => a.daysLeft - b.daysLeft);
 }

@@ -131,13 +131,13 @@ function DashboardPage() {
                 </Link>
               </li>
             )}
-            {expiring.map(({ contract: c, daysLeft }) => (
+            {expiring.map(({ contract: c, end, daysLeft }) => (
               <li key={`contract-${c.id}`}>
                 <Link to="/contracts" className="flex items-center gap-2">
                   <FileClock className="h-4 w-4 shrink-0 text-warning-foreground" />
                   החוזה של {c.tenant_name || (c.apartment === "a" ? settings.nameA : settings.nameB)} מסתיים
-                  {daysLeft === 0 ? " היום" : ` בעוד ${daysLeft} ימים`} ({fmtDate(c.end_date ?? "")})
-                  {c.option_months > 0 ? ` · יש אופציה ל־${c.option_months} חודשים` : ""}
+                  {daysLeft === 0 ? " היום" : ` בעוד ${daysLeft} ימים`} ({fmtDate(end)})
+                  {c.option_months > 0 && !c.option_exercised ? ` · יש אופציה ל־${c.option_months} חודשים` : ""}
                 </Link>
               </li>
             ))}

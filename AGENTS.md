@@ -21,3 +21,4 @@
 - Meter photos live in the private `contracts` bucket under `<owner>/meters/...` so the existing storage rules apply; the path is kept on the meter (`photo`).
 - Chart series colors per apartment are `--apt-a` / `--apt-b` in styles.css (validated for color-blind separation in light and dark); one measure per chart.
 - Migrations run from this machine with the lovable-supabase-migrations runner live in supabase/migrations/; the repo is public, so they never contain emails or passwords.
+- Contracts carry tenant/landlord names and ID numbers and `option_exercised`; `effectiveEnd()` in rent.ts is the commitment end (option end once exercised) and drives the contract status and expiry reminders.

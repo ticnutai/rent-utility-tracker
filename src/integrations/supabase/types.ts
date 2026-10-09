@@ -43,11 +43,15 @@ export type Database = {
           file_name: string | null
           file_path: string | null
           id: string
+          landlord_id_number: string
+          landlord_name: string
           monthly_rent: number
           notes: string
+          option_exercised: boolean
           option_months: number
           option_rent: number
           start_date: string | null
+          tenant_id_number: string
           tenant_name: string
           tenant_phone: string
           user_id: string
@@ -59,11 +63,15 @@ export type Database = {
           file_name?: string | null
           file_path?: string | null
           id?: string
+          landlord_id_number?: string
+          landlord_name?: string
           monthly_rent?: number
           notes?: string
+          option_exercised?: boolean
           option_months?: number
           option_rent?: number
           start_date?: string | null
+          tenant_id_number?: string
           tenant_name?: string
           tenant_phone?: string
           user_id?: string
@@ -75,11 +83,15 @@ export type Database = {
           file_name?: string | null
           file_path?: string | null
           id?: string
+          landlord_id_number?: string
+          landlord_name?: string
           monthly_rent?: number
           notes?: string
+          option_exercised?: boolean
           option_months?: number
           option_rent?: number
           start_date?: string | null
+          tenant_id_number?: string
           tenant_name?: string
           tenant_phone?: string
           user_id?: string

@@ -6,6 +6,8 @@ import { Plus, FileText, Phone, Trash2, Upload, ExternalLink } from "lucide-reac
 import { supabase } from "@/integrations/supabase/client";
 import { activeOwnerId, contractsQuery, settingsQuery, type Contract } from "@/lib/data";
 import { fmtDate, ils } from "@/lib/billing";
+import { effectiveEnd } from "@/lib/rent";
+import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,11 +34,15 @@ const blank = (apartment: "a" | "b"): Contract => ({
   apartment,
   tenant_name: "",
   tenant_phone: "",
+  tenant_id_number: "",
+  landlord_name: "",
+  landlord_id_number: "",
   start_date: null,
   end_date: null,
   monthly_rent: 0,
   option_months: 0,
   option_rent: 0,
+  option_exercised: false,
   notes: "",
   file_path: null,
   file_name: null,
@@ -81,7 +87,7 @@ function ContractsPage() {
       )}
 
       {list.map((c) => {
-        const d = daysLeft(c.end_date);
+        const d = daysLeft(effectiveEnd(c));
         const status = d === null ? null : d < 0 ? { t: "הסתיים", cls: "bg-muted text-muted-foreground" } : d <= 60 ? { t: `נשארו ${d} ימים`, cls: "bg-warning text-warning-foreground" } : { t: "פעיל", cls: "bg-success text-success-foreground" };
         return (
           <div key={c.id} className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
@@ -101,9 +107,11 @@ function ContractsPage() {
               <Info t="סיום שכירות" v={fmtDate(c.end_date ?? "") || "—"} />
               <Info t="שכירות חודשית" v={ils(Number(c.monthly_rent))} />
               <Info
-                t="אופציה"
+                t={c.option_exercised ? "אופציה (מומשה)" : "אופציה"}
                 v={c.option_months ? `${c.option_months} חודשים · ${ils(Number(c.option_rent))}/חודש` : "—"}
               />
+              <Info t="ת״ז הדייר" v={c.tenant_id_number || "—"} />
+              <Info t="משכיר" v={[c.landlord_name, c.landlord_id_number && `ת״ז ${c.landlord_id_number}`].filter(Boolean).join(" · ") || "—"} />
             </div>
             {c.notes && <p className="whitespace-pre-wrap text-sm text-muted-foreground">{c.notes}</p>}
             <div className="flex gap-2">
@@ -143,6 +151,7 @@ function ContractForm({ initial, onDone }: { initial: Contract; onDone: () => vo
   const qc = useQueryClient();
   const [c, setC] = useState<Contract>(initial);
   const [file, setFile] = useState<File | null>(null);
+  const [dropFile, setDropFile] = useState(false);
   const [busy, setBusy] = useState(false);
   const s = (k: keyof Contract, num = false) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setC({ ...c, [k]: num ? Number(e.target.value) : e.target.value || (k.endsWith("date") ? null : "") });
@@ -161,6 +170,9 @@ function ContractForm({ initial, onDone }: { initial: Contract; onDone: () => vo
         uploaded = path;
         file_path = path;
         file_name = file.name;
+      } else if (dropFile) {
+        file_path = null;
+        file_name = null;
       }
       const { id, ...rest } = c;
       const row = { ...rest, file_path, file_name };
@@ -168,8 +180,8 @@ function ContractForm({ initial, onDone }: { initial: Contract; onDone: () => vo
         ? await supabase.from("contracts").update(row).eq("id", id)
         : await supabase.from("contracts").insert({ ...row, user_id: owner });
       if (error) throw error;
-      // Remove the replaced file only once the row points at the new one.
-      if (uploaded && c.file_path) await supabase.storage.from("contracts").remove([c.file_path]);
+      // Remove the replaced or dropped file only once the row no longer points at it.
+      if ((uploaded || dropFile) && c.file_path) await supabase.storage.from("contracts").remove([c.file_path]);
       await qc.invalidateQueries({ queryKey: ["contracts"] });
       toast.success("החוזה נשמר");
       onDone();
@@ -194,7 +206,14 @@ function ContractForm({ initial, onDone }: { initial: Contract; onDone: () => vo
   return (
     <div className="space-y-3 p-4">
       <F l="שם הדייר"><Input value={c.tenant_name} onChange={s("tenant_name")} /></F>
-      <F l="טלפון"><Input dir="ltr" inputMode="tel" value={c.tenant_phone} onChange={s("tenant_phone")} /></F>
+      <div className="grid grid-cols-2 gap-3">
+        <F l="טלפון"><Input dir="ltr" inputMode="tel" value={c.tenant_phone} onChange={s("tenant_phone")} /></F>
+        <F l="ת״ז הדייר"><Input dir="ltr" inputMode="numeric" value={c.tenant_id_number} onChange={s("tenant_id_number")} /></F>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <F l="שם המשכיר"><Input value={c.landlord_name} onChange={s("landlord_name")} /></F>
+        <F l="ת״ז המשכיר"><Input dir="ltr" value={c.landlord_id_number} onChange={s("landlord_id_number")} /></F>
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <F l="תחילת שכירות"><Input type="date" value={c.start_date ?? ""} onChange={s("start_date")} /></F>
         <F l="סיום שכירות"><Input type="date" value={c.end_date ?? ""} onChange={s("end_date")} /></F>
@@ -204,13 +223,22 @@ function ContractForm({ initial, onDone }: { initial: Contract; onDone: () => vo
         <F l="אופציה — מספר חודשים"><Input type="number" inputMode="numeric" value={c.option_months} onChange={s("option_months", true)} /></F>
         <F l="שכירות באופציה (₪/חודש)"><Input type="number" inputMode="decimal" value={c.option_rent} onChange={s("option_rent", true)} /></F>
       </div>
+      <label className="flex items-center justify-between rounded-xl bg-muted px-3 py-2.5 text-sm">
+        <span>הדייר מימש את האופציה</span>
+        <Switch checked={c.option_exercised} onCheckedChange={(v) => setC({ ...c, option_exercised: v })} />
+      </label>
       <F l="הערות"><Textarea value={c.notes} onChange={s("notes")} /></F>
       <F l="קובץ החוזה (PDF / תמונה)">
         <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed p-3 text-sm text-muted-foreground">
           <Upload className="h-4 w-4" />
-          {file?.name ?? c.file_name ?? "בחירת קובץ"}
-          <input type="file" accept="application/pdf,image/*,.doc,.docx" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          {file?.name ?? (dropFile ? null : c.file_name) ?? "בחירת קובץ"}
+          <input type="file" accept="application/pdf,image/*,.doc,.docx" className="hidden" onChange={(e) => { setFile(e.target.files?.[0] ?? null); setDropFile(false); }} />
         </label>
+        {(file || (c.file_path && !dropFile)) && (
+          <Button variant="ghost" size="sm" className="text-destructive" onClick={() => { setFile(null); setDropFile(true); }}>
+            הסרת הקובץ
+          </Button>
+        )}
       </F>
       <Button className="h-11 w-full" onClick={save} disabled={busy}>{busy ? "שומר..." : "שמירה"}</Button>
       {c.id && (

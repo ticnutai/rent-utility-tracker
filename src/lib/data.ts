@@ -152,11 +152,15 @@ export type Contract = {
   apartment: "a" | "b";
   tenant_name: string;
   tenant_phone: string;
+  tenant_id_number: string;
+  landlord_name: string;
+  landlord_id_number: string;
   start_date: string | null;
   end_date: string | null;
   monthly_rent: number;
   option_months: number;
   option_rent: number;
+  option_exercised: boolean;
   notes: string;
   file_path: string | null;
   file_name: string | null;
