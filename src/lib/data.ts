@@ -11,10 +11,28 @@ export const DEFAULT_SETTINGS: Settings & { phoneA: string; phoneB: string } = {
 };
 export type FullSettings = typeof DEFAULT_SETTINGS;
 
+const OWNER_KEY = "active-owner";
+
+/** Account whose data is shown: the user's own, or a partner's account they were invited to. */
+export async function activeOwnerId(): Promise<string> {
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) throw new Error("לא מחובר");
+  const stored = typeof window === "undefined" ? null : localStorage.getItem(OWNER_KEY);
+  if (stored && stored !== u.user.id) {
+    const { data } = await supabase.from("account_members").select("id").eq("owner_id", stored).limit(1);
+    if (data?.length) return stored;
+  }
+  return u.user.id;
+}
+export function setActiveOwner(id: string) {
+  localStorage.setItem(OWNER_KEY, id);
+}
+
 export const settingsQuery = queryOptions({
   queryKey: ["settings"],
   queryFn: async (): Promise<FullSettings> => {
-    const { data } = await supabase.from("settings").select("*").maybeSingle();
+    const owner = await activeOwnerId();
+    const { data } = await supabase.from("settings").select("*").eq("user_id", owner).maybeSingle();
     if (!data) return DEFAULT_SETTINGS;
     return {
       nameA: data.name_a,
@@ -27,10 +45,8 @@ export const settingsQuery = queryOptions({
 });
 
 export async function saveSettings(s: FullSettings) {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) throw new Error("לא מחובר");
   const { error } = await supabase.from("settings").upsert({
-    user_id: u.user.id,
+    user_id: await activeOwnerId(),
     name_a: s.nameA,
     name_b: s.nameB,
     vat_rate: s.vatRate,
@@ -44,7 +60,7 @@ export async function saveSettings(s: FullSettings) {
 export const periodsQuery = queryOptions({
   queryKey: ["periods"],
   queryFn: async (): Promise<Period[]> => {
-    const { data, error } = await supabase.from("periods").select("*").order("start_date", { ascending: false });
+    const { data, error } = await supabase.from("periods").select("*").eq("user_id", await activeOwnerId()).order("start_date", { ascending: false });
     if (error) throw error;
     return (data ?? []).map((r) => ({
       ...(r.data as unknown as Omit<Period, "id" | "start" | "end">),
@@ -59,7 +75,7 @@ export async function savePeriod(p: Period, isNew: boolean) {
   const { id, start, end, ...rest } = p;
   const row = { start_date: start, end_date: end, data: rest as never, updated_at: new Date().toISOString() };
   const { error } = isNew
-    ? await supabase.from("periods").insert({ id, ...row })
+    ? await supabase.from("periods").insert({ id, ...row, user_id: await activeOwnerId() })
     : await supabase.from("periods").update(row).eq("id", id);
   if (error) throw error;
 }
@@ -87,7 +103,7 @@ export type Contract = {
 export const contractsQuery = queryOptions({
   queryKey: ["contracts"],
   queryFn: async (): Promise<Contract[]> => {
-    const { data, error } = await supabase.from("contracts").select("*").order("start_date", { ascending: false });
+    const { data, error } = await supabase.from("contracts").select("*").eq("user_id", await activeOwnerId()).order("start_date", { ascending: false });
     if (error) throw error;
     return (data ?? []) as Contract[];
   },

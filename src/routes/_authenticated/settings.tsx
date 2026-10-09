@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { applyTheme, getStoredMode, getStoredTheme, THEMES, type ThemeId, type ThemeMode } from "@/lib/theme";
 import { Moon, Sun } from "lucide-react";
+import { AccountSharing } from "@/components/AccountSharing";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({ meta: [
@@ -60,6 +61,7 @@ function SettingsPage() {
         <Field label='שיעור מע"מ (%)'><Input type="number" inputMode="decimal" value={s.vatRate} onChange={f("vatRate")} /></Field>
         <Button className="h-11 w-full" onClick={save}>שמירה</Button>
       </div>
+      <AccountSharing />
       <Button
         variant="outline"
         className="w-full"

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Plus, FileText, Phone, Trash2, Upload, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { contractsQuery, settingsQuery, type Contract } from "@/lib/data";
+import { activeOwnerId, contractsQuery, settingsQuery, type Contract } from "@/lib/data";
 import { fmtDate, ils } from "@/lib/billing";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -151,12 +151,11 @@ function ContractForm({ initial, onDone }: { initial: Contract; onDone: () => vo
     setBusy(true);
     let uploaded: string | null = null;
     try {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) throw new Error();
+      const owner = await activeOwnerId();
       let file_path = c.file_path, file_name = c.file_name;
       if (file) {
         const ext = file.name.split(".").pop() ?? "pdf";
-        const path = `${u.user.id}/${crypto.randomUUID()}.${ext}`;
+        const path = `${owner}/${crypto.randomUUID()}.${ext}`;
         const { error } = await supabase.storage.from("contracts").upload(path, file);
         if (error) throw error;
         uploaded = path;
@@ -167,7 +166,7 @@ function ContractForm({ initial, onDone }: { initial: Contract; onDone: () => vo
       const row = { ...rest, file_path, file_name };
       const { error } = id
         ? await supabase.from("contracts").update(row).eq("id", id)
-        : await supabase.from("contracts").insert(row);
+        : await supabase.from("contracts").insert({ ...row, user_id: owner });
       if (error) throw error;
       // Remove the replaced file only once the row points at the new one.
       if (uploaded && c.file_path) await supabase.storage.from("contracts").remove([c.file_path]);
