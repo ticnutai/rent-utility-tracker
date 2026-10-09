@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { AlertTriangle, CheckCircle2, Clock, Wallet, Zap, Droplets } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, Wallet, Zap, Droplets, CalendarX } from "lucide-react";
+import { missingMonths } from "@/lib/report";
+import { HE_MONTHS } from "@/lib/periodLabel";
 import { periodsQuery, settingsQuery } from "@/lib/data";
 import { calcPeriod, fmtDate, ils, type Period, type Payment } from "@/lib/billing";
 
@@ -64,6 +66,8 @@ function DashboardPage() {
     };
   };
   const apts = [apt("a"), apt("b")];
+  const thisYear = new Date().getFullYear();
+  const missing = missingMonths(periods, thisYear);
 
   return (
     <div className="space-y-4">
@@ -85,6 +89,18 @@ function DashboardPage() {
           <div className="text-xs text-muted-foreground">מעל {LATE_DAYS} ימים אחרי סוף התקופה</div>
         </div>
       </div>
+
+      {missing.length > 0 && (
+        <Link to="/bills" className="block rounded-2xl border-2 border-destructive bg-card p-4">
+          <div className="flex items-center gap-2 font-bold text-destructive">
+            <CalendarX className="h-4 w-4" /> חסרים חשבונות ב-{missing.length} חודשים ({thisYear})
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {missing.map((m) => <span key={m} className="rounded-full bg-destructive px-2 py-0.5 text-xs text-destructive-foreground">{HE_MONTHS[m]}</span>)}
+          </div>
+        </Link>
+      )}
+
 
       <section className="space-y-3">
         <h2 className="text-lg font-bold">מצב הדירות</h2>
