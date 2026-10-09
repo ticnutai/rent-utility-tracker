@@ -4,7 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Plus, FileText, Phone, Trash2, Upload, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { contractsQuery, settingsQuery, type Contract } from "@/lib/data";
+import { activeOwnerId, contractsQuery, settingsQuery, type Contract } from "@/lib/data";
 import { fmtDate, ils } from "@/lib/billing";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
