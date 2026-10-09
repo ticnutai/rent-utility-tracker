@@ -5,7 +5,9 @@ import { PeriodPicker, PeriodTitle } from "@/components/PeriodPicker";
 import { BillsCalendar } from "@/components/BillsCalendar";
 import { periodYear } from "@/lib/periodLabel";
 import { toast } from "sonner";
-import { Plus, Zap, Droplets, Copy, MessageCircle, Trash2, ChevronLeft, Check, Clock, LayoutGrid, Table2, Scale, CalendarDays } from "lucide-react";
+import { Plus, Zap, Droplets, Copy, MessageCircle, Trash2, ChevronLeft, Check, Clock, LayoutGrid, Table2, Scale, CalendarDays, FileSpreadsheet, FileText } from "lucide-react";
+import { latestBefore } from "@/lib/report";
+import { exportExcel, exportPdf } from "@/lib/exportReport";
 import { periodsQuery, savePeriod, deletePeriod, settingsQuery, type FullSettings } from "@/lib/data";
 import { calcPeriod, calcMeter, newPeriod, fmtDate, ils, summaryText, type Period, type Meter, type Payment } from "@/lib/billing";
 import { Button } from "@/components/ui/button";
@@ -57,19 +59,27 @@ function BillsPage() {
   };
 
   const createFromCalendar = (start: string, end: string) => {
-    const previous = allPeriods.filter((p) => p.end < start).sort((a, b) => b.end.localeCompare(a.end))[0];
-    setEditing({ p: { ...newPeriod(previous), start, end }, isNew: true });
+    setEditing({ p: { ...newPeriod(latestBefore(allPeriods, start)), start, end }, isNew: true });
   };
+  const reportYear = view === "calendar" ? calendarYear : year === "all" ? years[0] ?? new Date().getFullYear() : year;
 
   if (editing) return <Editor initial={editing.p} isNew={editing.isNew} settings={settings} onClose={() => setEditing(null)} />;
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 sm:flex sm:justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="min-w-0 truncate text-2xl font-bold">חשבונות</h1>
-        <Button onClick={() => setEditing({ p: newPeriod(periods[0]), isNew: true })}>
-          <Plus className="h-4 w-4" /> תקופה חדשה
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => exportExcel(allPeriods, settings, reportYear).catch(() => toast.error("הייצוא נכשל"))}>
+            <FileSpreadsheet className="h-4 w-4" /> Excel {reportYear}
+          </Button>
+          <Button variant="outline" onClick={() => { if (!exportPdf(allPeriods, settings, reportYear)) toast.error("יש לאפשר חלונות קופצים"); }}>
+            <FileText className="h-4 w-4" /> PDF {reportYear}
+          </Button>
+          <Button onClick={() => setEditing({ p: newPeriod(latestBefore(allPeriods)), isNew: true })}>
+            <Plus className="h-4 w-4" /> תקופה חדשה
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1 text-muted-foreground sm:grid-cols-4">
