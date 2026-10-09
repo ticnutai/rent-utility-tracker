@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { saveSettings, settingsQuery, type FullSettings } from "@/lib/data";
@@ -61,8 +61,9 @@ function SettingsPage() {
 }
 
 function ThemePicker() {
-  const [theme, setTheme] = useState<ThemeId>(getStoredTheme);
-  const [mode, setMode] = useState<ThemeMode>(getStoredMode);
+  const [theme, setTheme] = useState<ThemeId>("emerald");
+  const [mode, setMode] = useState<ThemeMode>("light");
+  useEffect(() => { setTheme(getStoredTheme()); setMode(getStoredMode()); }, []);
 
   const pickTheme = (t: ThemeId) => { setTheme(t); applyTheme(t, mode); };
   const pickMode = (m: ThemeMode) => { setMode(m); applyTheme(theme, m); };
