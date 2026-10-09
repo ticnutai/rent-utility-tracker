@@ -12,15 +12,18 @@ const KEY = "app-theme";
 const MODE_KEY = "app-theme-mode";
 
 export function getStoredTheme(): ThemeId {
+  if (typeof window === "undefined") return "emerald";
   const v = localStorage.getItem(KEY);
   return THEMES.some((t) => t.id === v) ? (v as ThemeId) : "emerald";
 }
 
 export function getStoredMode(): ThemeMode {
+  if (typeof window === "undefined") return "light";
   return localStorage.getItem(MODE_KEY) === "dark" ? "dark" : "light";
 }
 
 export function applyTheme(theme: ThemeId, mode: ThemeMode) {
+  if (typeof window === "undefined") return;
   const root = document.documentElement;
   root.dataset["theme"] = theme;
   root.classList.toggle("dark", mode === "dark");
