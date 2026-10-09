@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { PeriodPicker, PeriodTitle } from "@/components/PeriodPicker";
+import { periodYear } from "@/lib/periodLabel";
 import { toast } from "sonner";
 import { Plus, Zap, Droplets, Copy, MessageCircle, Trash2, ChevronLeft, Check, Clock, LayoutGrid, Table2, Scale } from "lucide-react";
 import { periodsQuery, savePeriod, deletePeriod, settingsQuery, type FullSettings } from "@/lib/data";
@@ -27,7 +29,10 @@ const viewModes: { id: ViewMode; label: string; icon: typeof LayoutGrid }[] = [
 ];
 
 function BillsPage() {
-  const { data: periods } = useSuspenseQuery(periodsQuery);
+  const { data: allPeriods } = useSuspenseQuery(periodsQuery);
+  const years = [...new Set(allPeriods.map((p) => periodYear(p.start)))].sort((a, b) => b - a);
+  const [year, setYear] = useState<number | "all">("all");
+  const periods = year === "all" ? allPeriods : allPeriods.filter((p) => periodYear(p.start) === year);
   const { data: settings } = useSuspenseQuery(settingsQuery);
   const [editing, setEditing] = useState<{ p: Period; isNew: boolean } | null>(null);
   const [view, setView] = useState<ViewMode>("cards");
@@ -66,6 +71,17 @@ function BillsPage() {
         ))}
       </div>
 
+      {years.length > 1 && (
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {(["all", ...years] as const).map((y) => (
+            <button key={y} onClick={() => setYear(y)}
+              className={`shrink-0 rounded-full border px-4 py-1.5 text-sm transition-colors ${year === y ? "border-primary bg-primary text-primary-foreground" : "bg-card text-foreground"}`}>
+              {y === "all" ? "הכול" : y}
+            </button>
+          ))}
+        </div>
+      )}
+
       {periods.length === 0 && (
         <div className="rounded-2xl border border-dashed bg-card p-8 text-center text-muted-foreground">
           עדיין אין תקופות. אפשר להוסיף גם תקופות מהעבר.
@@ -82,7 +98,7 @@ function BillsPage() {
               className="w-full rounded-2xl border bg-card p-4 text-start shadow-sm transition-colors hover:bg-accent/40"
             >
               <div className="flex items-center justify-between">
-                <span className="font-semibold">{fmtDate(p.start)} – {fmtDate(p.end)}</span>
+                <PeriodTitle start={p.start} end={p.end} />
                 <ChevronLeft className="h-4 w-4 text-muted-foreground" />
               </div>
               <div className="mt-3 grid grid-cols-2 gap-3">
@@ -130,7 +146,7 @@ function TableView({ periods, settings, onEdit }: { periods: Period[]; settings:
             const c = calcPeriod(p, settings.vatRate);
             return (
               <tr key={p.id} onClick={() => onEdit(p)} className="cursor-pointer border-b last:border-0 hover:bg-accent/40">
-                <td className="p-3 font-medium whitespace-nowrap">{fmtDate(p.start)} – {fmtDate(p.end)}</td>
+                <td className="p-3 whitespace-nowrap"><PeriodTitle start={p.start} end={p.end} /></td>
                 <td className="p-3 text-end whitespace-nowrap">{c.elec.a} קוט״ש · {ils(c.elec.costA)}</td>
                 <td className="p-3 text-end whitespace-nowrap">{c.elec.b} קוט״ש · {ils(c.elec.costB)}</td>
                 <td className="p-3 text-end whitespace-nowrap">{c.water.a} קוב · {ils(c.water.costA)}</td>
@@ -200,7 +216,7 @@ function CompareView({ periods, settings }: { periods: Period[]; settings: FullS
         const max = Math.max(c.totalA, c.totalB, 1);
         return (
           <div key={p.id} className="rounded-2xl border bg-card p-4">
-            <div className="text-xs text-muted-foreground">{fmtDate(p.start)} – {fmtDate(p.end)}</div>
+            <PeriodTitle start={p.start} end={p.end} className="text-sm" />
             {([["a", settings.nameA, c.totalA], ["b", settings.nameB, c.totalB]] as const).map(([k, name, total]) => (
               <div key={k} className="mt-2 flex items-center gap-2">
                 <span className="w-20 shrink-0 truncate text-xs">{name}</span>
@@ -369,13 +385,6 @@ function Editor({ initial, isNew, settings, onClose }: { initial: Period; isNew:
     onClose();
   }
 
-  const setMonths = (n: number) => {
-    const s = new Date(p.start || new Date());
-    const e = new Date(s);
-    e.setMonth(e.getMonth() + n);
-    setP({ ...p, end: e.toISOString().slice(0, 10) });
-  };
-
   return (
     <div className="space-y-4 pb-24">
       <div className="flex items-center justify-between">
@@ -384,20 +393,7 @@ function Editor({ initial, isNew, settings, onClose }: { initial: Period; isNew:
       </div>
 
       <section className="space-y-3 rounded-2xl border bg-card p-4">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">מתאריך</Label>
-            <Input type="date" className="h-11" value={p.start} onChange={(e) => setP({ ...p, start: e.target.value })} />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">עד תאריך</Label>
-            <Input type="date" className="h-11" value={p.end} onChange={(e) => setP({ ...p, end: e.target.value })} />
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => setMonths(1)}>חודש</Button>
-          <Button size="sm" variant="outline" onClick={() => setMonths(2)}>חודשיים</Button>
-        </div>
+        <PeriodPicker start={p.start} end={p.end} onChange={(start, end) => setP({ ...p, start, end })} />
       </section>
 
       <MeterCard kind="elec" m={p.elec} set={(elec) => setP({ ...p, elec })} settings={settings} />
