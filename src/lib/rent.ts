@@ -60,6 +60,13 @@ export function effectiveEnd(c: Contract) {
   return c.option_exercised && c.option_months > 0 ? addMonths(c.end_date, c.option_months) : c.end_date;
 }
 
+/** The contract whose (effective) term overlaps a date range for an apartment, latest start first. */
+export function contractForRange(contracts: Contract[], apt: Apartment, start: string, end: string) {
+  return contracts
+    .filter((c) => c.apartment === apt && (!c.start_date || c.start_date <= end) && (effectiveEnd(c) ?? "9999") >= start)
+    .sort((x, y) => (y.start_date ?? "").localeCompare(x.start_date ?? ""))[0];
+}
+
 /** The contract covering a month for an apartment, and whether the month falls in its option period. */
 export function contractForMonth(contracts: Contract[], apt: Apartment, month: string) {
   const last = monthEnd(month);

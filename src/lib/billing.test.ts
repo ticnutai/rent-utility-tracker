@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calcMeter, calcPeriod, localISO, newPeriod, paidAmount, type Period } from "./billing";
+import { calcMeter, calcPeriod, localISO, newPeriod, paidAmount, summaryText, type Period } from "./billing";
 
 const m = { mainPrev: 1000, mainCurr: 1500, aPrev: 200, aCurr: 400, rate: 0.5, vat: false, fixed: 40 };
 
@@ -28,6 +28,19 @@ describe("meter replacement", () => {
   });
   it("the sub-meter can be replaced on its own", () => {
     expect(calcMeter({ ...m, aSwap: { oldEnd: 250, newStart: 10 }, aCurr: 160 }, 18).a).toBe(50 + 150);
+  });
+});
+
+describe("summaryText", () => {
+  const s = { nameA: "יחידה קטנה", nameB: "יחידה גדולה", vatRate: 18 };
+  const p: Period = { ...newPeriod(undefined, 18, new Date(2026, 0, 1)), elec: { ...m, vat: false, fixed: 0 }, water: { ...m, vat: false, fixed: 0 } };
+  it("greets the tenant by name and names the sub-meter by its unit", () => {
+    const text = summaryText(p, s, "b", "משה");
+    expect(text).toContain("שלום משה,");
+    expect(text).toContain("מונה יחידה קטנה:");
+  });
+  it("leaves out the connection-fee line when there is no fee", () => {
+    expect(summaryText(p, s, "a")).not.toContain("דמי חיבור");
   });
 });
 

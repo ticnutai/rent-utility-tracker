@@ -9,7 +9,8 @@ import { toast } from "sonner";
 import { Plus, Zap, Droplets, Copy, MessageCircle, Trash2, ChevronLeft, Check, Clock, LayoutGrid, Table2, Scale, CalendarDays, FileSpreadsheet, FileText, Camera, ChartColumn } from "lucide-react";
 import { latestBefore } from "@/lib/report";
 import { exportExcel, exportPdf } from "@/lib/exportReport";
-import { periodsQuery, savePeriod, deletePeriod, settingsQuery, signedFileUrl, uploadMeterPhoto, type FullSettings } from "@/lib/data";
+import { contractsQuery, periodsQuery, savePeriod, deletePeriod, settingsQuery, signedFileUrl, uploadMeterPhoto, type FullSettings } from "@/lib/data";
+import { contractForRange } from "@/lib/rent";
 import { calcPeriod, calcMeter, newPeriod, fmtDate, ils, summaryText, localISO, paidAmount, periodVat, type Period, type Meter, type MeterSwap, type Payment } from "@/lib/billing";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,7 +30,11 @@ export const Route = createFileRoute("/_authenticated/bills")({
   validateSearch: (search: Record<string, unknown>): { edit?: string } =>
     typeof search["edit"] === "string" ? { edit: search["edit"] } : {},
   loader: ({ context }) =>
-    Promise.all([context.queryClient.ensureQueryData(periodsQuery), context.queryClient.ensureQueryData(settingsQuery)]),
+    Promise.all([
+      context.queryClient.ensureQueryData(periodsQuery),
+      context.queryClient.ensureQueryData(settingsQuery),
+      context.queryClient.ensureQueryData(contractsQuery),
+    ]),
   component: BillsPage,
 });
 
@@ -478,6 +483,10 @@ function Editor({ initial, isNew, settings, onClose }: { initial: Period; isNew:
   const qc = useQueryClient();
   const [p, setP] = useState<Period>(initial);
   const vatRate = periodVat(p, settings.vatRate);
+  // The tenant on contract during this period: greeted by name, and their phone is used for WhatsApp.
+  const { data: contracts } = useSuspenseQuery(contractsQuery);
+  const tenantA = contractForRange(contracts, "a", p.start, p.end);
+  const tenantB = contractForRange(contracts, "b", p.start, p.end);
   const dirty = isNew || JSON.stringify(p) !== JSON.stringify(initial);
 
   useEffect(() => {
@@ -543,8 +552,8 @@ function Editor({ initial, isNew, settings, onClose }: { initial: Period; isNew:
 
       <h2 className="pt-2 text-lg font-bold">תשלומים ושליחה</h2>
       <div className="grid items-start gap-4 lg:grid-cols-2">
-        <PayCard name={settings.nameA} phone={settings.phoneA} total={c.totalA} pay={p.payA} set={(payA) => setP({ ...p, payA })} text={summaryText(p, settings, "a")} />
-        <PayCard name={settings.nameB} phone={settings.phoneB} total={c.totalB} pay={p.payB} set={(payB) => setP({ ...p, payB })} text={summaryText(p, settings, "b")} />
+        <PayCard name={tenantA?.tenant_name ? `${settings.nameA} · ${tenantA.tenant_name}` : settings.nameA} phone={tenantA?.tenant_phone || settings.phoneA} total={c.totalA} pay={p.payA} set={(payA) => setP({ ...p, payA })} text={summaryText(p, settings, "a", tenantA?.tenant_name)} />
+        <PayCard name={tenantB?.tenant_name ? `${settings.nameB} · ${tenantB.tenant_name}` : settings.nameB} phone={tenantB?.tenant_phone || settings.phoneB} total={c.totalB} pay={p.payB} set={(payB) => setP({ ...p, payB })} text={summaryText(p, settings, "b", tenantB?.tenant_name)} />
       </div>
 
       {!isNew && (

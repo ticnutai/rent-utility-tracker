@@ -125,7 +125,8 @@ export function newPeriod(prev?: Period, vatRate?: number, today = new Date()): 
 export const fmtDate = (d: string) => (d ? d.split("-").reverse().join("/") : "");
 export const ils = (n: number) => `₪${n.toLocaleString("he-IL", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-export function summaryText(p: Period, s: Settings, who: "a" | "b") {
+/** `tenant` greets the tenant by name; without it the apartment name from settings is used. */
+export function summaryText(p: Period, s: Settings, who: "a" | "b", tenant?: string) {
   const c = calcPeriod(p, s.vatRate);
   const vatRate = periodVat(p, s.vatRate);
   const name = who === "a" ? s.nameA : s.nameB;
@@ -137,22 +138,24 @@ export function summaryText(p: Period, s: Settings, who: "a" | "b") {
     swap ? `${prev} ← ${swap.oldEnd} (המונה הוחלף) ${swap.newStart} ← ${curr}` : `${prev} ← ${curr}`;
   const meterLines = (m: Meter) =>
     who === "a"
-      ? `מונה דירה: ${reading(m.aPrev, m.aCurr, m.aSwap)}`
-      : `מונה ראשי: ${reading(m.mainPrev, m.mainCurr, m.mainSwap)}\nמונה דירה א': ${reading(m.aPrev, m.aCurr, m.aSwap)}`;
+      ? `מונה ${s.nameA}: ${reading(m.aPrev, m.aCurr, m.aSwap)}`
+      : `מונה ראשי: ${reading(m.mainPrev, m.mainCurr, m.mainSwap)}\nמונה ${s.nameA}: ${reading(m.aPrev, m.aCurr, m.aSwap)}`;
+  // No connection-fee line when there is no fee.
+  const fee = (r: MeterResult) => (r.fixedEach ? [`חצי דמי חיבור: ${ils(r.fixedEach)}`] : []);
   return [
-    `שלום ${name},`,
+    `שלום ${tenant || name},`,
     `פירוט חשבון חשמל ומים לתקופה ${fmtDate(p.start)} – ${fmtDate(p.end)}:`,
     ``,
     `⚡ *חשמל*`,
     meterLines(p.elec),
     `צריכה: ${cons(e)} קוט"ש × ${ils(e.effRate)}${vat(p.elec)}`,
-    `חצי דמי חיבור: ${ils(e.fixedEach)}`,
+    ...fee(e),
     `סה"כ חשמל: *${ils(cost(e))}*`,
     ``,
     `💧 *מים*`,
     meterLines(p.water),
     `צריכה: ${cons(w)} קוב × ${ils(w.effRate)}${vat(p.water)}`,
-    `חצי דמי חיבור: ${ils(w.fixedEach)}`,
+    ...fee(w),
     `סה"כ מים: *${ils(cost(w))}*`,
     ``,
     `💰 *סה"כ לתשלום: ${ils(who === "a" ? c.totalA : c.totalB)}*`,
