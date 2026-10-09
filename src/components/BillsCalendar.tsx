@@ -22,7 +22,7 @@ export function BillsCalendar({ periods, settings, year, onYearChange, onEdit, o
     const range = monthRange(year, mode === "bi" ? Math.floor(month / 2) * 2 : month, mode === "bi" ? 2 : 1);
     const existing = periods.find((p) => p.start === range.start && p.end === range.end);
     if (existing) onEdit(existing);
-    else onCreate(range.start, range.end);
+    else onCreate(range.start, mode === "custom" ? range.start : range.end);
   };
 
   return (
@@ -50,7 +50,7 @@ export function BillsCalendar({ periods, settings, year, onYearChange, onEdit, o
             <article key={month} className="min-w-0 rounded-lg border bg-card p-3 text-card-foreground" aria-label={`${name} ${year}`}>
               <div className="mb-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
                 <Button variant="ghost" className="justify-start px-1 text-base font-bold" onClick={() => selectMonth(month)} aria-label={`פתיחת ${name} ${year}`}>{name}</Button>
-                <Button variant="ghost" size="icon" aria-label={`הוספת תקופה ${name} ${year}`} title={`הוספת תקופה ${name}`} onClick={() => { const r = monthRange(year, mode === "bi" ? Math.floor(month / 2) * 2 : month, mode === "bi" ? 2 : 1); onCreate(r.start, r.end); }}><Plus /></Button>
+                <Button variant="ghost" size="icon" aria-label={`הוספת תקופה ${name} ${year}`} title={`הוספת תקופה ${name}`} onClick={() => { const r = monthRange(year, mode === "bi" ? Math.floor(month / 2) * 2 : month, mode === "bi" ? 2 : 1); onCreate(r.start, mode === "custom" ? r.start : r.end); }}><Plus /></Button>
               </div>
               <div className="grid grid-cols-7 text-center text-xs text-muted-foreground">{weekdays.map((day) => <span key={day} className="pb-2">{day}</span>)}</div>
               <div className="grid min-h-48 grid-cols-7 auto-rows-8 gap-y-1">

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, CalendarIcon } from "lucide-react";
@@ -83,7 +82,7 @@ function DateControl({ label, value, onChange }: { label: string; value: string;
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild><Button type="button" variant="outline" aria-label={label} className="h-11 w-full justify-between px-2"><span>{value ? value.split("-").reverse().join("/") : "בחירת תאריך"}</span><CalendarIcon /></Button></PopoverTrigger>
       <PopoverContent className="pointer-events-auto w-auto p-0" align="start" dir="rtl">
-        <Calendar locale={he} dir="rtl" mode="single" captionLayout="dropdown" selected={date} defaultMonth={date} startMonth={new Date(1990, 0)} endMonth={new Date(new Date().getFullYear() + 10, 11)} onSelect={(day) => { if (!day) return; onChange(format(day, "yyyy-MM-dd")); setOpen(false); }} />
+        <Calendar locale={he} dir="rtl" mode="single" captionLayout="dropdown" selected={date} defaultMonth={date ?? new Date()} startMonth={new Date(1990, 0)} endMonth={new Date(new Date().getFullYear() + 10, 11)} onSelect={(day) => { if (!day) return; onChange(format(day, "yyyy-MM-dd")); setOpen(false); }} />
       </PopoverContent>
     </Popover>
   );

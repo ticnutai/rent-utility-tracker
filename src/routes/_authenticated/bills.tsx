@@ -106,7 +106,7 @@ function BillsPage() {
       )}
 
       {view === "cards" && <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        periods.map((p) => {
+        {periods.map((p) => {
           const c = calcPeriod(p, settings.vatRate);
           return (
             <Button variant="ghost"
