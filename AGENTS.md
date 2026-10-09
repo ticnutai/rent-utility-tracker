@@ -14,3 +14,5 @@
 - Contract files go to the private `contracts` bucket under `<user_id>/...` and are opened via short-lived signed URLs.
 - The authenticated shell is full width with responsive gutters; page-level grids arrange repeated content so wide screens are used without stretching form fields unnecessarily.
 - Calendar view reuses the existing period editor and persistence; pure range helpers in periodLabel.ts own navigation and overlap logic so calendar and picker share tested date rules.
+- Account sharing: `account_members` (owner + invited email) and `can_access(owner)` gate periods/contracts/settings/contract files; browser queries filter by `activeOwnerId()` and inserts set `user_id` to it, so partners read and write the owner's data.
+- Roles live in `user_roles` checked via `has_role`; admin-only user management runs in server functions that verify the role before using the admin client.
