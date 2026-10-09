@@ -40,17 +40,17 @@ export function AccountSharing() {
 
   const add = async () => {
     const e = email.trim().toLowerCase();
-    if (!/^\S+@\S+\.\S+$/.test(e)) return toast.error("כתובת מייל לא תקינה");
-    if (e === me.email.toLowerCase()) return toast.error("זה המייל שלך");
+    if (!/^\S+@\S+\.\S+$/.test(e)) { toast.error("כתובת מייל לא תקינה"); return; }
+    if (e === me.email.toLowerCase()) { toast.error("זה המייל שלך"); return; }
     const { error } = await supabase.from("account_members").insert({ member_email: e });
-    if (error) return toast.error(error.code === "23505" ? "המייל כבר משותף" : "ההוספה נכשלה");
+    if (error) { toast.error(error.code === "23505" ? "המייל כבר משותף" : "ההוספה נכשלה"); return; }
     setEmail("");
     toast.success("השותף נוסף");
     void load();
   };
   const remove = async (id: string) => {
     const { error } = await supabase.from("account_members").delete().eq("id", id);
-    if (error) return toast.error("ההסרה נכשלה");
+    if (error) { toast.error("ההסרה נכשלה"); return; }
     void load();
   };
   const switchTo = async (owner: string) => {
