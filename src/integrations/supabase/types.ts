@@ -161,6 +161,48 @@ export type Database = {
         }
         Relationships: []
       }
+      rent_payments: {
+        Row: {
+          amount_due: number
+          amount_paid: number
+          apartment: string
+          created_at: string
+          id: string
+          month: string
+          notes: string
+          paid: boolean
+          paid_date: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount_due?: number
+          amount_paid?: number
+          apartment: string
+          created_at?: string
+          id?: string
+          month: string
+          notes?: string
+          paid?: boolean
+          paid_date?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          amount_due?: number
+          amount_paid?: number
+          apartment?: string
+          created_at?: string
+          id?: string
+          month?: string
+          notes?: string
+          paid?: boolean
+          paid_date?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       settings: {
         Row: {
           name_a: string

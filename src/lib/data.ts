@@ -1,6 +1,7 @@
 import { queryOptions } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Period, Settings } from "./billing";
+import type { RentPayment } from "./rent";
 
 export const DEFAULT_SETTINGS: Settings & { phoneA: string; phoneB: string } = {
   nameA: "דירה א'",
@@ -80,8 +81,56 @@ export async function savePeriod(p: Period, isNew: boolean) {
   if (error) throw error;
 }
 
-export async function deletePeriod(id: string) {
-  const { error } = await supabase.from("periods").delete().eq("id", id);
+export async function deletePeriod(p: Period) {
+  const { error } = await supabase.from("periods").delete().eq("id", p.id);
+  if (error) throw error;
+  const photos = [p.elec.photo, p.water.photo].filter((x): x is string => !!x);
+  if (photos.length) await supabase.storage.from("contracts").remove(photos);
+}
+
+/** Meter photos share the private contracts bucket, under the owner's folder so the same access rules apply. */
+export async function uploadMeterPhoto(file: File) {
+  const ext = file.name.split(".").pop() || "jpg";
+  const path = `${await activeOwnerId()}/meters/${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage.from("contracts").upload(path, file);
+  if (error) throw error;
+  return path;
+}
+
+export async function signedFileUrl(path: string, seconds = 300) {
+  const { data, error } = await supabase.storage.from("contracts").createSignedUrl(path, seconds);
+  if (error || !data) throw error ?? new Error("no url");
+  return data.signedUrl;
+}
+
+export const rentPaymentsQuery = queryOptions({
+  queryKey: ["rent-payments"],
+  queryFn: async (): Promise<RentPayment[]> => {
+    const { data, error } = await supabase.from("rent_payments").select("*").eq("user_id", await activeOwnerId()).order("month");
+    if (error) throw error;
+    return (data ?? []).map((r) => ({
+      id: r.id,
+      apartment: r.apartment as RentPayment["apartment"],
+      month: r.month,
+      amount_due: Number(r.amount_due),
+      amount_paid: Number(r.amount_paid),
+      paid: r.paid,
+      paid_date: r.paid_date,
+      notes: r.notes,
+    }));
+  },
+});
+
+/** One row per apartment and month; saving again updates it. */
+export async function saveRentPayment(p: Omit<RentPayment, "id">) {
+  const { error } = await supabase
+    .from("rent_payments")
+    .upsert({ ...p, user_id: await activeOwnerId(), updated_at: new Date().toISOString() }, { onConflict: "user_id,apartment,month" });
+  if (error) throw error;
+}
+
+export async function deleteRentPayment(id: string) {
+  const { error } = await supabase.from("rent_payments").delete().eq("id", id);
   if (error) throw error;
 }
 

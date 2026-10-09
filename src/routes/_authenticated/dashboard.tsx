@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { AlertTriangle, CheckCircle2, Clock, Wallet, Zap, Droplets, CalendarX } from "lucide-react";
+import { AlertTriangle, BellRing, CheckCircle2, Clock, Wallet, Zap, Droplets, CalendarX, FileClock, Home } from "lucide-react";
 import { missingMonths } from "@/lib/report";
 import { HE_MONTHS } from "@/lib/periodLabel";
-import { periodsQuery, settingsQuery } from "@/lib/data";
+import { contractsQuery, periodsQuery, rentPaymentsQuery, settingsQuery } from "@/lib/data";
+import { expiringContracts, openRent } from "@/lib/rent";
 import { calcPeriod, fmtDate, ils, localISO, paidAmount, type Period, type Payment } from "@/lib/billing";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -18,7 +19,12 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
     ],
   }),
   loader: ({ context }) =>
-    Promise.all([context.queryClient.ensureQueryData(periodsQuery), context.queryClient.ensureQueryData(settingsQuery)]),
+    Promise.all([
+      context.queryClient.ensureQueryData(periodsQuery),
+      context.queryClient.ensureQueryData(settingsQuery),
+      context.queryClient.ensureQueryData(contractsQuery),
+      context.queryClient.ensureQueryData(rentPaymentsQuery),
+    ]),
   component: DashboardPage,
 });
 
@@ -36,6 +42,8 @@ type Row = {
 function DashboardPage() {
   const { data: periods } = useSuspenseQuery(periodsQuery);
   const { data: settings } = useSuspenseQuery(settingsQuery);
+  const { data: contracts } = useSuspenseQuery(contractsQuery);
+  const { data: rentPayments } = useSuspenseQuery(rentPaymentsQuery);
 
   const lateCutoff = localISO(new Date(Date.now() - LATE_DAYS * 86400000));
 
@@ -68,15 +76,21 @@ function DashboardPage() {
   const apts = [apt("a"), apt("b")];
   const thisYear = new Date().getFullYear();
   const missing = missingMonths(periods, thisYear);
+  const rentOpen = openRent(contracts, rentPayments);
+  const rentLateBy = (["a", "b"] as const)
+    .map((who) => ({ who, list: rentOpen.filter((r) => r.apartment === who && r.status === "late") }))
+    .filter((x) => x.list.length > 0);
+  const expiring = expiringContracts(contracts);
+  const reminders = rentLateBy.length + (late.length ? 1 : 0) + expiring.length;
 
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-bold">ראשי</h1>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <div className="rounded-2xl border bg-card p-4">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Wallet className="h-4 w-4" /> יתרות פתוחות
+            <Wallet className="h-4 w-4" /> חשמל ומים פתוחים
           </div>
           <div className="mt-1 text-2xl font-bold">{ils(sum(open))}</div>
           <div className="text-xs text-muted-foreground">{open.length} חיובים ממתינים</div>
@@ -88,7 +102,48 @@ function DashboardPage() {
           <div className={`mt-1 text-2xl font-bold ${late.length ? "text-destructive" : ""}`}>{late.length}</div>
           <div className="text-xs text-muted-foreground">מעל {LATE_DAYS} ימים אחרי סוף התקופה</div>
         </div>
+        <Link to="/rent" className="rounded-2xl border bg-card p-4 transition-colors hover:bg-accent/40">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Home className="h-4 w-4" /> שכר דירה פתוח
+          </div>
+          <div className="mt-1 text-2xl font-bold">{ils(rentOpen.reduce((s, r) => s + r.balance, 0))}</div>
+          <div className="text-xs text-muted-foreground">{rentOpen.length} חודשים לא שולמו במלואם</div>
+        </Link>
       </div>
+
+      {reminders > 0 && (
+        <section className="space-y-2 rounded-2xl border bg-card p-4">
+          <h2 className="flex items-center gap-2 text-lg font-bold"><BellRing className="h-5 w-5 text-primary" /> תזכורות</h2>
+          <ul className="space-y-2 text-sm">
+            {rentLateBy.map(({ who, list }) => (
+              <li key={`rent-${who}`}>
+                <Link to="/rent" className="flex items-center gap-2 text-destructive">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  שכר דירה באיחור ב{who === "a" ? settings.nameA : settings.nameB}: {list.length} חודשים, {ils(list.reduce((s, r) => s + r.balance, 0))}
+                </Link>
+              </li>
+            ))}
+            {late.length > 0 && (
+              <li>
+                <Link to="/bills" className="flex items-center gap-2 text-destructive">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  {late.length} חשבונות חשמל ומים באיחור, {ils(sum(late))}
+                </Link>
+              </li>
+            )}
+            {expiring.map(({ contract: c, daysLeft }) => (
+              <li key={`contract-${c.id}`}>
+                <Link to="/contracts" className="flex items-center gap-2">
+                  <FileClock className="h-4 w-4 shrink-0 text-warning-foreground" />
+                  החוזה של {c.tenant_name || (c.apartment === "a" ? settings.nameA : settings.nameB)} מסתיים
+                  {daysLeft === 0 ? " היום" : ` בעוד ${daysLeft} ימים`} ({fmtDate(c.end_date ?? "")})
+                  {c.option_months > 0 ? ` · יש אופציה ל־${c.option_months} חודשים` : ""}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {missing.length > 0 && (
         <Link to="/bills" className="block rounded-2xl border-2 border-destructive bg-card p-4">

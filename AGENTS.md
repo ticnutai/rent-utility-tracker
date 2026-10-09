@@ -16,3 +16,8 @@
 - Calendar view reuses the existing period editor and persistence; pure range helpers in periodLabel.ts own navigation and overlap logic so calendar and picker share tested date rules.
 - Account sharing: `account_members` (owner + invited email) and `can_access(owner)` gate periods/contracts/settings/contract files; browser queries filter by `activeOwnerId()` and inserts set `user_id` to it, so partners read and write the owner's data.
 - Roles live in `user_roles` checked via `has_role`; admin-only user management runs in server functions that verify the role before using the admin client.
+- Rent tracking: `rent_payments` (one row per owner + apartment + month, shared via `can_access`). Pure rules in src/lib/rent.ts: the covering contract sets the amount due (option rent after `end_date` within `option_months`, counted only once a payment is recorded); a recorded month keeps its own `amount_due`; late after `RENT_LATE_DAYS`.
+- Meter replacement is stored per reading pair (`mainSwap` / `aSwap` = old meter's last reading + new meter's first) inside the period's jsonb; `usage()` in billing.ts is the only place that turns readings into consumption.
+- Meter photos live in the private `contracts` bucket under `<owner>/meters/...` so the existing storage rules apply; the path is kept on the meter (`photo`).
+- Chart series colors per apartment are `--apt-a` / `--apt-b` in styles.css (validated for color-blind separation in light and dark); one measure per chart.
+- Migrations run from this machine with the lovable-supabase-migrations runner live in supabase/migrations/; the repo is public, so they never contain emails or passwords.

@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router";
-import { LayoutDashboard, Receipt, FileText, Settings as SettingsIcon } from "lucide-react";
+import { LayoutDashboard, Receipt, Wallet, FileText, Settings as SettingsIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated")({
@@ -14,7 +14,8 @@ export const Route = createFileRoute("/_authenticated")({
 const tabs = [
   { to: "/dashboard", label: "ראשי", icon: LayoutDashboard },
   { to: "/bills", label: "חשבונות", icon: Receipt },
-  { to: "/contracts", label: "דיירים וחוזים", icon: FileText },
+  { to: "/rent", label: "שכירות", icon: Wallet },
+  { to: "/contracts", label: "חוזים", icon: FileText },
   { to: "/settings", label: "הגדרות", icon: SettingsIcon },
 ] as const;
 
@@ -25,7 +26,7 @@ function AppLayout() {
         <Outlet />
       </main>
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-card/95 text-card-foreground backdrop-blur">
-        <div className="grid w-full grid-cols-4 px-2 sm:px-6 lg:px-10">
+        <div className="grid w-full grid-cols-5 px-2 sm:px-6 lg:px-10">
           {tabs.map((t) => (
             <Link
               key={t.to}

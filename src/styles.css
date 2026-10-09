@@ -389,3 +389,13 @@
     color: var(--color-foreground);
   }
 }
+
+/* Per-apartment series colors for charts (validated for color-blind separation, light and dark). */
+:root {
+  --apt-a: #2a78d6;
+  --apt-b: #eb6834;
+}
+.dark {
+  --apt-a: #3987e5;
+  --apt-b: #d95926;
+}

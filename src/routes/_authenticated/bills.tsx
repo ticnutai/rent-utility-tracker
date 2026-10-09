@@ -3,13 +3,14 @@ import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { PeriodPicker, PeriodTitle } from "@/components/PeriodPicker";
 import { BillsCalendar } from "@/components/BillsCalendar";
+import { UsageCharts } from "@/components/UsageCharts";
 import { periodYear } from "@/lib/periodLabel";
 import { toast } from "sonner";
-import { Plus, Zap, Droplets, Copy, MessageCircle, Trash2, ChevronLeft, Check, Clock, LayoutGrid, Table2, Scale, CalendarDays, FileSpreadsheet, FileText } from "lucide-react";
+import { Plus, Zap, Droplets, Copy, MessageCircle, Trash2, ChevronLeft, Check, Clock, LayoutGrid, Table2, Scale, CalendarDays, FileSpreadsheet, FileText, Camera, ChartColumn } from "lucide-react";
 import { latestBefore } from "@/lib/report";
 import { exportExcel, exportPdf } from "@/lib/exportReport";
-import { periodsQuery, savePeriod, deletePeriod, settingsQuery, type FullSettings } from "@/lib/data";
-import { calcPeriod, calcMeter, newPeriod, fmtDate, ils, summaryText, localISO, paidAmount, periodVat, type Period, type Meter, type Payment } from "@/lib/billing";
+import { periodsQuery, savePeriod, deletePeriod, settingsQuery, signedFileUrl, uploadMeterPhoto, type FullSettings } from "@/lib/data";
+import { calcPeriod, calcMeter, newPeriod, fmtDate, ils, summaryText, localISO, paidAmount, periodVat, type Period, type Meter, type MeterSwap, type Payment } from "@/lib/billing";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,12 +33,13 @@ export const Route = createFileRoute("/_authenticated/bills")({
   component: BillsPage,
 });
 
-type ViewMode = "cards" | "table" | "compare" | "calendar";
+type ViewMode = "cards" | "table" | "compare" | "charts" | "calendar";
 
 const viewModes: { id: ViewMode; label: string; icon: typeof LayoutGrid }[] = [
   { id: "cards", label: "כרטיסים", icon: LayoutGrid },
   { id: "table", label: "טבלה", icon: Table2 },
   { id: "compare", label: "השוואה", icon: Scale },
+  { id: "charts", label: "גרפים", icon: ChartColumn },
   { id: "calendar", label: "לוח שנה", icon: CalendarDays },
 ];
 
@@ -61,7 +63,7 @@ function BillsPage() {
   }, [edit, allPeriods, navigate]);
   useEffect(() => {
     const v = localStorage.getItem("bills-view");
-    if (v === "table" || v === "compare" || v === "calendar") setView(v);
+    if (v === "table" || v === "compare" || v === "charts" || v === "calendar") setView(v);
   }, []);
 
   const pick = (v: ViewMode) => {
@@ -93,7 +95,7 @@ function BillsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1 text-muted-foreground sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1 text-muted-foreground sm:grid-cols-5">
         {viewModes.map((m) => (
           <Button
             key={m.id}
@@ -149,6 +151,7 @@ function BillsPage() {
 
       {view === "table" && <TableView periods={periods} settings={settings} onEdit={(p) => setEditing({ p, isNew: false })} />}
       {view === "compare" && <CompareView periods={periods} settings={settings} />}
+      {view === "charts" && <UsageCharts periods={periods} settings={settings} />}
       {view === "calendar" && <BillsCalendar periods={allPeriods} settings={settings} year={calendarYear} onYearChange={setCalendarYear} onEdit={(p) => setEditing({ p, isNew: false })} onCreate={createFromCalendar} />}
     </div>
   );
@@ -320,11 +323,14 @@ function MeterCard({ kind, m, set, settings, vatRate }: { kind: "elec" | "water"
         <Num label="קריאה קודמת" value={m.mainPrev} onChange={u("mainPrev")} />
         <Num label="קריאה נוכחית" value={m.mainCurr} onChange={u("mainCurr")} />
       </div>
+      <SwapFields swap={m.mainSwap} set={(mainSwap) => set(withSwap(m, "mainSwap", mainSwap))} />
       <div className="text-sm font-medium">מונה דירה א' ({settings.nameA})</div>
       <div className="grid grid-cols-2 gap-3">
         <Num label="קריאה קודמת" value={m.aPrev} onChange={u("aPrev")} />
         <Num label="קריאה נוכחית" value={m.aCurr} onChange={u("aCurr")} />
       </div>
+      <SwapFields swap={m.aSwap} set={(aSwap) => set(withSwap(m, "aSwap", aSwap))} />
+      <MeterPhoto path={m.photo} set={(photo) => set(photo ? { ...m, photo } : withoutPhoto(m))} />
       <div className="grid grid-cols-2 gap-3">
         <Num label={`תעריף ל${unit} (₪)`} value={m.rate} onChange={u("rate")} />
         <Num label="דמי חיבור/קבוע (₪)" value={m.fixed} onChange={u("fixed")} />
@@ -340,6 +346,75 @@ function MeterCard({ kind, m, set, settings, vatRate }: { kind: "elec" | "water"
         <Stat t={settings.nameB} v={`${r.b} ${unit}`} sub={ils(r.costB)} />
       </div>
     </section>
+  );
+}
+
+/** Optional meter fields must be removed, not set to undefined (exactOptionalPropertyTypes). */
+function withSwap(m: Meter, key: "mainSwap" | "aSwap", swap: MeterSwap | undefined): Meter {
+  const { [key]: _old, ...rest } = m;
+  return swap ? { ...rest, [key]: swap } : rest;
+}
+function withoutPhoto(m: Meter): Meter {
+  const { photo: _old, ...rest } = m;
+  return rest;
+}
+
+function SwapFields({ swap, set }: { swap: MeterSwap | undefined; set: (s: MeterSwap | undefined) => void }) {
+  return (
+    <div className="space-y-2">
+      <label className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Switch checked={!!swap} onCheckedChange={(v) => set(v ? { oldEnd: 0, newStart: 0 } : undefined)} />
+        המונה הוחלף בתקופה הזו
+      </label>
+      {swap && (
+        <div className="grid grid-cols-2 gap-3 rounded-xl border border-dashed p-3">
+          <Num label="קריאה אחרונה במונה הישן" value={swap.oldEnd} onChange={(oldEnd) => set({ ...swap, oldEnd })} />
+          <Num label="קריאה ראשונה במונה החדש" value={swap.newStart} onChange={(newStart) => set({ ...swap, newStart })} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MeterPhoto({ path, set }: { path: string | undefined; set: (path: string | undefined) => void }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    setUrl(null);
+    if (path) signedFileUrl(path).then(setUrl).catch(() => setUrl(null));
+  }, [path]);
+
+  const pick = async (file: File | undefined) => {
+    if (!file) return;
+    setBusy(true);
+    try {
+      set(await uploadMeterPhoto(file));
+      toast.success("התמונה נשמרה. אל תשכח ללחוץ על שמירה");
+    } catch {
+      toast.error("העלאת התמונה נכשלה");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-3">
+      {url && (
+        <a href={url} target="_blank" rel="noreferrer" className="shrink-0">
+          <img src={url} alt="תמונת המונה" className="h-16 w-16 rounded-lg border object-cover" />
+        </a>
+      )}
+      <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed px-3 py-2 text-sm text-muted-foreground">
+        <Camera className="h-4 w-4" />
+        {busy ? "מעלה..." : path ? "החלפת תמונת המונה" : "צילום המונה"}
+        <input type="file" accept="image/*" capture="environment" className="hidden" disabled={busy} onChange={(e) => void pick(e.target.files?.[0])} />
+      </label>
+      {path && (
+        <Button variant="ghost" size="sm" onClick={() => set(undefined)}>
+          הסרה
+        </Button>
+      )}
+    </div>
   );
 }
 
@@ -438,7 +513,7 @@ function Editor({ initial, isNew, settings, onClose }: { initial: Period; isNew:
   async function remove() {
     if (!confirm("למחוק את התקופה?")) return;
     try {
-      await deletePeriod(p.id);
+      await deletePeriod(p);
       await qc.invalidateQueries({ queryKey: ["periods"] });
       toast.success("התקופה נמחקה");
       onClose();

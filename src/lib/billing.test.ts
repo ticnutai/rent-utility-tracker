@@ -20,6 +20,17 @@ describe("calcMeter", () => {
   });
 });
 
+describe("meter replacement", () => {
+  it("adds the old meter's tail to the new meter's usage", () => {
+    const r = calcMeter({ ...m, mainSwap: { oldEnd: 1200, newStart: 0 }, mainCurr: 300 }, 18);
+    expect(r.main).toBe(200 + 300);
+    expect(r.b).toBe(500 - 200);
+  });
+  it("the sub-meter can be replaced on its own", () => {
+    expect(calcMeter({ ...m, aSwap: { oldEnd: 250, newStart: 10 }, aCurr: 160 }, 18).a).toBe(50 + 150);
+  });
+});
+
 describe("localISO", () => {
   it("keeps the local calendar day just after midnight", () => {
     expect(localISO(new Date(2026, 9, 1, 0, 30))).toBe("2026-10-01");

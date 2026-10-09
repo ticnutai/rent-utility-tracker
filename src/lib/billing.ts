@@ -1,5 +1,8 @@
 import { detectPeriodMode, shiftPeriod } from "./periodLabel";
 
+/** A meter replaced mid-period: last reading on the old meter and first reading on the new one. */
+export type MeterSwap = { oldEnd: number; newStart: number };
+
 export type Meter = {
   mainPrev: number;
   mainCurr: number;
@@ -8,6 +11,10 @@ export type Meter = {
   rate: number;
   vat: boolean;
   fixed: number;
+  mainSwap?: MeterSwap;
+  aSwap?: MeterSwap;
+  /** Storage path (contracts bucket, under the owner's folder) of a photo of the readings. */
+  photo?: string;
 };
 
 export type Payment = { paid: boolean; amount: number; date: string; notes: string };
@@ -38,10 +45,17 @@ export type MeterResult = {
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
+/** Consumption between two readings; after a replacement it is the old meter's tail plus the new meter's usage. */
+export function usage(prev: number, curr: number, swap?: MeterSwap) {
+  return swap
+    ? (swap.oldEnd || 0) - (prev || 0) + ((curr || 0) - (swap.newStart || 0))
+    : (curr || 0) - (prev || 0);
+}
+
 export function calcMeter(m: Meter, vatRate: number): MeterResult {
   const mult = m.vat ? 1 + vatRate / 100 : 1;
-  const main = (m.mainCurr || 0) - (m.mainPrev || 0);
-  const a = (m.aCurr || 0) - (m.aPrev || 0);
+  const main = usage(m.mainPrev, m.mainCurr, m.mainSwap);
+  const a = usage(m.aPrev, m.aCurr, m.aSwap);
   const b = main - a;
   const effRate = (m.rate || 0) * mult;
   const fixedEach = ((m.fixed || 0) * mult) / 2;
@@ -119,10 +133,12 @@ export function summaryText(p: Period, s: Settings, who: "a" | "b") {
   const cons = (r: MeterResult) => (who === "a" ? r.a : r.b);
   const cost = (r: MeterResult) => (who === "a" ? r.costA : r.costB);
   const vat = (m: Meter) => (m.vat ? ` (כולל מע"מ ${vatRate}%)` : "");
+  const reading = (prev: number, curr: number, swap?: MeterSwap) =>
+    swap ? `${prev} ← ${swap.oldEnd} (המונה הוחלף) ${swap.newStart} ← ${curr}` : `${prev} ← ${curr}`;
   const meterLines = (m: Meter) =>
     who === "a"
-      ? `מונה דירה: ${m.aPrev} ← ${m.aCurr}`
-      : `מונה ראשי: ${m.mainPrev} ← ${m.mainCurr}\nמונה דירה א': ${m.aPrev} ← ${m.aCurr}`;
+      ? `מונה דירה: ${reading(m.aPrev, m.aCurr, m.aSwap)}`
+      : `מונה ראשי: ${reading(m.mainPrev, m.mainCurr, m.mainSwap)}\nמונה דירה א': ${reading(m.aPrev, m.aCurr, m.aSwap)}`;
   return [
     `שלום ${name},`,
     `פירוט חשבון חשמל ומים לתקופה ${fmtDate(p.start)} – ${fmtDate(p.end)}:`,
