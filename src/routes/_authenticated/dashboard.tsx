@@ -156,7 +156,7 @@ function DashboardPage() {
           </div>
         ) : (
           (() => {
-            const p = periods[0];
+            const p = periods[0]!;
             const c = calcPeriod(p, settings.vatRate);
             return (
               <div className="rounded-2xl border bg-card p-4">
