@@ -15,7 +15,18 @@ export type Meter = {
   aSwap?: MeterSwap;
   /** Storage path (contracts bucket, under the owner's folder) of a photo of the readings. */
   photo?: string;
+  /** Total of the supplier's bill (₪ incl. VAT) the rate was derived from, kept for reference. */
+  supplierBill?: number;
 };
+
+/**
+ * Average price per unit from the supplier's bill: bill total ÷ main-meter consumption.
+ * Tiered tariffs (e.g. water's discounted quota) and fixed charges are spread fairly by usage.
+ */
+export function rateFromBill(billTotal: number, mainUsage: number) {
+  if (!(billTotal > 0) || !(mainUsage > 0)) return null;
+  return Math.round((billTotal / mainUsage) * 10000) / 10000;
+}
 
 export type Payment = { paid: boolean; amount: number; date: string; notes: string };
 

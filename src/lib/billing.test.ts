@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calcMeter, calcPeriod, localISO, newPeriod, paidAmount, summaryText, type Period } from "./billing";
+import { calcMeter, calcPeriod, localISO, newPeriod, paidAmount, rateFromBill, summaryText, type Period } from "./billing";
 
 const m = { mainPrev: 1000, mainCurr: 1500, aPrev: 200, aCurr: 400, rate: 0.5, vat: false, fixed: 40 };
 
@@ -95,5 +95,13 @@ describe("period VAT", () => {
   });
   it("older periods without a rate fall back to the settings rate", () => {
     expect(calcPeriod(base(undefined), 18).totalA).toBe(calcPeriod(base(18), 0).totalA);
+  });
+});
+
+describe("rateFromBill", () => {
+  it("divides the bill by the main-meter usage", () => expect(rateFromBill(545.2, 58.4)).toBe(9.3356));
+  it("needs both a bill and usage", () => {
+    expect(rateFromBill(0, 58)).toBeNull();
+    expect(rateFromBill(500, 0)).toBeNull();
   });
 });

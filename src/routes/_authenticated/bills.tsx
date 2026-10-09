@@ -11,7 +11,7 @@ import { latestBefore } from "@/lib/report";
 import { exportExcel, exportPdf } from "@/lib/exportReport";
 import { contractsQuery, periodsQuery, savePeriod, deletePeriod, settingsQuery, signedFileUrl, uploadMeterPhoto, type FullSettings } from "@/lib/data";
 import { contractForRange } from "@/lib/rent";
-import { calcPeriod, calcMeter, newPeriod, fmtDate, ils, summaryText, localISO, paidAmount, periodVat, type Period, type Meter, type MeterSwap, type Payment } from "@/lib/billing";
+import { calcPeriod, calcMeter, newPeriod, fmtDate, ils, summaryText, localISO, paidAmount, periodVat, rateFromBill, type Period, type Meter, type MeterSwap, type Payment } from "@/lib/billing";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -340,6 +340,7 @@ function MeterCard({ kind, m, set, settings, vatRate }: { kind: "elec" | "water"
         <Num label={`תעריף ל${unit} (₪)`} value={m.rate} onChange={u("rate")} />
         <Num label="דמי חיבור/קבוע (₪)" value={m.fixed} onChange={u("fixed")} />
       </div>
+      <SupplierRate m={m} main={r.main} unit={unit} set={set} />
       <label className="flex items-center justify-between rounded-xl bg-muted px-3 py-2.5 text-sm">
         <span>הוספת מע"מ ({vatRate}%)</span>
         <Switch checked={m.vat} onCheckedChange={(v) => set({ ...m, vat: v })} />
@@ -362,6 +363,37 @@ function withSwap(m: Meter, key: "mainSwap" | "aSwap", swap: MeterSwap | undefin
 function withoutPhoto(m: Meter): Meter {
   const { photo: _old, ...rest } = m;
   return rest;
+}
+
+/** Sets the rate from the supplier's bill so tiered prices and fixed charges split by actual usage. */
+function SupplierRate({ m, main, unit, set }: { m: Meter; main: number; unit: string; set: (m: Meter) => void }) {
+  const [open, setOpen] = useState(false);
+  const [total, setTotal] = useState(m.supplierBill ?? 0);
+  const apply = () => {
+    const rate = rateFromBill(total, main);
+    if (rate === null) { toast.error("צריך סכום חשבון וצריכה במונה הראשי"); return; }
+    set({ ...m, rate, vat: false, supplierBill: total });
+    toast.success(`התעריף עודכן: ${rate} ₪ ל${unit} (כולל מע"מ)`);
+    setOpen(false);
+  };
+  if (!open) {
+    return (
+      <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => setOpen(true)}>
+        {m.supplierBill ? `התעריף חושב מחשבון של ${ils(m.supplierBill)} · חישוב מחדש` : "חישוב התעריף מתוך חשבון הספק"}
+      </Button>
+    );
+  }
+  return (
+    <div className="space-y-2 rounded-xl border border-dashed p-3">
+      <p className="text-xs text-muted-foreground">
+        סכום החשבון של התקופה (כולל מע"מ) חלקי הצריכה במונה הראשי ({main} {unit}). כך מחיר מדורג ותשלומים קבועים מתחלקים לפי הצריכה.
+      </p>
+      <div className="flex items-end gap-2">
+        <div className="flex-1"><Num label="סכום חשבון הספק (₪)" value={total} onChange={setTotal} /></div>
+        <Button className="h-11" onClick={apply}>חישוב</Button>
+      </div>
+    </div>
+  );
 }
 
 function SwapFields({ swap, set }: { swap: MeterSwap | undefined; set: (s: MeterSwap | undefined) => void }) {
