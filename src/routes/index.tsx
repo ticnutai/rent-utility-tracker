@@ -40,7 +40,7 @@ function Index() {
           ))}
         </ul>
         <Button asChild className="mt-10 h-12 w-full text-base">
-          <Link to="/bills">כניסה למערכת</Link>
+          <Link to="/dashboard">כניסה למערכת</Link>
         </Button>
       </div>
     </div>
