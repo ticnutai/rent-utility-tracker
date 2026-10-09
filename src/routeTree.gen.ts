@@ -12,6 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuthenticatedBillsRouteImport } from './routes/_authenticated/bills'
+import { Route as AuthenticatedContractsRouteImport } from './routes/_authenticated/contracts'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 
 const IndexRoute = IndexRouteImport.update({
@@ -28,6 +30,16 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedBillsRoute = AuthenticatedBillsRouteImport.update({
+  id: '/bills',
+  path: '/bills',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedContractsRoute = AuthenticatedContractsRouteImport.update({
+  id: '/contracts',
+  path: '/contracts',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -37,11 +49,15 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/bills': typeof AuthenticatedBillsRoute
+  '/contracts': typeof AuthenticatedContractsRoute
   '/settings': typeof AuthenticatedSettingsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/bills': typeof AuthenticatedBillsRoute
+  '/contracts': typeof AuthenticatedContractsRoute
   '/settings': typeof AuthenticatedSettingsRoute
 }
 export interface FileRoutesById {
@@ -49,15 +65,23 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/_authenticated/bills': typeof AuthenticatedBillsRoute
+  '/_authenticated/contracts': typeof AuthenticatedContractsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/settings'
+  fullPaths: '/' | '/auth' | '/bills' | '/contracts' | '/settings'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/settings'
+  to: '/' | '/auth' | '/bills' | '/contracts' | '/settings'
   id:
-    '__root__' | '/' | '/_authenticated' | '/auth' | '/_authenticated/settings'
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/auth'
+    | '/_authenticated/bills'
+    | '/_authenticated/contracts'
+    | '/_authenticated/settings'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -89,6 +113,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/bills': {
+      id: '/_authenticated/bills'
+      path: '/bills'
+      fullPath: '/bills'
+      preLoaderRoute: typeof AuthenticatedBillsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/contracts': {
+      id: '/_authenticated/contracts'
+      path: '/contracts'
+      fullPath: '/contracts'
+      preLoaderRoute: typeof AuthenticatedContractsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/settings': {
       id: '/_authenticated/settings'
       path: '/settings'
@@ -100,10 +138,14 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedBillsRoute: typeof AuthenticatedBillsRoute
+  AuthenticatedContractsRoute: typeof AuthenticatedContractsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedBillsRoute: AuthenticatedBillsRoute,
+  AuthenticatedContractsRoute: AuthenticatedContractsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
 }
 
