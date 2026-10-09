@@ -3,7 +3,8 @@ import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { periodsQuery, savePeriod, saveSettings, settingsQuery, type FullSettings } from "@/lib/data";
+import { periodsQuery, savePeriod, saveSettings, settingsQuery, tariffsQuery, type FullSettings } from "@/lib/data";
+import { TariffsEditor } from "@/components/TariffsEditor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,7 +21,8 @@ export const Route = createFileRoute("/_authenticated/settings")({
     { property: "og:type", content: "website" },
     { name: "twitter:card", content: "summary" },
   ] }),
-  loader: ({ context }) => context.queryClient.ensureQueryData(settingsQuery),
+  loader: ({ context }) =>
+    Promise.all([context.queryClient.ensureQueryData(settingsQuery), context.queryClient.ensureQueryData(tariffsQuery)]),
   component: SettingsPage,
 });
 
@@ -61,6 +63,7 @@ function SettingsPage() {
         <Field label='שיעור מע"מ (%)'><Input type="number" inputMode="decimal" value={s.vatRate} onChange={f("vatRate")} /></Field>
         <Button className="h-11 w-full" onClick={save}>שמירה</Button>
       </div>
+      <TariffsEditor />
       <AccountSharing />
       <Button
         variant="outline"

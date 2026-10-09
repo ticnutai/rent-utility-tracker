@@ -40,7 +40,7 @@ describe("summaryText", () => {
     expect(text).toContain("מונה יחידה קטנה:");
   });
   it("leaves out the connection-fee line when there is no fee", () => {
-    expect(summaryText(p, s, "a")).not.toContain("דמי חיבור");
+    expect(summaryText(p, s, "a")).not.toContain("התשלום הקבוע");
   });
 });
 

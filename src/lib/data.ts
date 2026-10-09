@@ -2,6 +2,7 @@ import { queryOptions } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Period, Settings } from "./billing";
 import type { RentPayment } from "./rent";
+import type { Tariff } from "./tariffs";
 
 export const DEFAULT_SETTINGS: Settings & { phoneA: string; phoneB: string } = {
   nameA: "דירה א'",
@@ -116,6 +117,35 @@ export async function signedFileUrl(path: string, seconds = 300) {
   return data.signedUrl;
 }
 
+export const tariffsQuery = queryOptions({
+  queryKey: ["tariffs"],
+  queryFn: async (): Promise<Tariff[]> => {
+    const { data, error } = await supabase.from("tariffs").select("*").eq("user_id", await activeOwnerId()).order("kind").order("valid_from");
+    if (error) throw error;
+    return (data ?? []).map((r) => ({
+      id: r.id,
+      kind: r.kind as Tariff["kind"],
+      value: Number(r.value),
+      valid_from: r.valid_from,
+      source: r.source,
+      notes: r.notes,
+    }));
+  },
+});
+
+/** One version per kind and start date; saving the same date again updates it. */
+export async function saveTariff(t: Omit<Tariff, "id">) {
+  const { error } = await supabase
+    .from("tariffs")
+    .upsert({ ...t, user_id: await activeOwnerId() }, { onConflict: "user_id,kind,valid_from" });
+  if (error) throw error;
+}
+
+export async function deleteTariff(id: string) {
+  const { error } = await supabase.from("tariffs").delete().eq("id", id);
+  if (error) throw error;
+}
+
 export const rentPaymentsQuery = queryOptions({
   queryKey: ["rent-payments"],
   queryFn: async (): Promise<RentPayment[]> => {
@@ -161,6 +191,11 @@ export type Contract = {
   option_months: number;
   option_rent: number;
   option_exercised: boolean;
+  /** People living in the unit – sets its discounted water quota. 0 = not entered. */
+  occupants: number;
+  area_m2: number;
+  /** Municipal tax is part of the rent (the default), so it isn't billed separately. */
+  arnona_included: boolean;
   notes: string;
   file_path: string | null;
   file_name: string | null;

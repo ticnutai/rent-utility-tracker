@@ -6,12 +6,13 @@ import { BillsCalendar } from "@/components/BillsCalendar";
 import { UsageCharts } from "@/components/UsageCharts";
 import { periodYear } from "@/lib/periodLabel";
 import { toast } from "sonner";
-import { Plus, Zap, Droplets, Copy, MessageCircle, Trash2, ChevronLeft, Check, Clock, LayoutGrid, Table2, Scale, CalendarDays, FileSpreadsheet, FileText, Camera, ChartColumn } from "lucide-react";
+import { Plus, Zap, Droplets, Copy, MessageCircle, Trash2, ChevronLeft, Check, Clock, LayoutGrid, Table2, Scale, CalendarDays, FileSpreadsheet, FileText, Camera, ChartColumn, Landmark, AlertTriangle } from "lucide-react";
 import { latestBefore } from "@/lib/report";
 import { exportExcel, exportPdf } from "@/lib/exportReport";
-import { contractsQuery, periodsQuery, savePeriod, deletePeriod, settingsQuery, signedFileUrl, uploadMeterPhoto, type FullSettings } from "@/lib/data";
+import { contractsQuery, tariffsQuery, type Contract, periodsQuery, savePeriod, deletePeriod, settingsQuery, signedFileUrl, uploadMeterPhoto, type FullSettings } from "@/lib/data";
 import { contractForRange } from "@/lib/rent";
-import { calcPeriod, calcMeter, newPeriod, fmtDate, ils, summaryText, localISO, paidAmount, periodVat, rateFromBill, type Period, type Meter, type MeterSwap, type Payment } from "@/lib/billing";
+import { applyOfficialTariffs } from "@/lib/tariffs";
+import { calcPeriod, calcMeter, newPeriod, fmtDate, ils, summaryText, localISO, paidAmount, periodVat, rateFromBill, type MeterSplit, type Period, type Meter, type MeterSwap, type Payment } from "@/lib/billing";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,6 +35,7 @@ export const Route = createFileRoute("/_authenticated/bills")({
       context.queryClient.ensureQueryData(periodsQuery),
       context.queryClient.ensureQueryData(settingsQuery),
       context.queryClient.ensureQueryData(contractsQuery),
+      context.queryClient.ensureQueryData(tariffsQuery),
     ]),
   component: BillsPage,
 });
@@ -340,6 +342,16 @@ function MeterCard({ kind, m, set, settings, vatRate }: { kind: "elec" | "water"
         <Num label={`תעריף ל${unit} (₪)`} value={m.rate} onChange={u("rate")} />
         <Num label="דמי חיבור/קבוע (₪)" value={m.fixed} onChange={u("fixed")} />
       </div>
+      {(m.tiers || (m.split && m.split !== "meter")) && (
+        <div className="flex items-start justify-between gap-2 rounded-xl bg-accent p-2.5 text-xs text-accent-foreground">
+          <span>
+            {m.tiers && `מחיר לפי מדרגות: מוזל ${m.tiers.low} ₪ (מכסה ${m.tiers.quotaA} / ${m.tiers.quotaB} קוב), מעל המכסה ${m.tiers.high} ₪. שדה התעריף לא בשימוש. `}
+            {m.split === "half" && "החלוקה: חצי־חצי, בלי מונה משנה."}
+            {m.split === "persons" && `החלוקה לפי נפשות: ${m.personsA ?? 0} מול ${m.personsB ?? 0}, בלי מונה משנה.`}
+          </span>
+          <Button variant="ghost" size="sm" className="h-7 shrink-0 px-2 text-xs" onClick={() => set(manualPricing(m))}>חזרה לידני</Button>
+        </div>
+      )}
       <SupplierRate m={m} main={r.main} unit={unit} set={set} />
       <label className="flex items-center justify-between rounded-xl bg-muted px-3 py-2.5 text-sm">
         <span>הוספת מע"מ ({vatRate}%)</span>
@@ -360,9 +372,71 @@ function withSwap(m: Meter, key: "mainSwap" | "aSwap", swap: MeterSwap | undefin
   const { [key]: _old, ...rest } = m;
   return swap ? { ...rest, [key]: swap } : rest;
 }
+/** Back to a single manual rate and the sub-meter readings. */
+function manualPricing(m: Meter): Meter {
+  const { tiers: _t, split: _s, personsA: _a, personsB: _b, ...rest } = m;
+  return rest;
+}
 function withoutPhoto(m: Meter): Meter {
   const { photo: _old, ...rest } = m;
   return rest;
+}
+
+/** Re-prices the period with the official tariffs; shows the full breakdown before applying it. */
+function OfficialTariffs({ p, contracts, onApply }: { p: Period; contracts: Contract[]; onApply: (p: Period) => void }) {
+  const { data: tariffs } = useSuspenseQuery(tariffsQuery);
+  const [open, setOpen] = useState(false);
+  const [split, setSplit] = useState<MeterSplit>(p.water.split ?? "meter");
+  const preview = open ? applyOfficialTariffs(p, contracts, tariffs, split) : null;
+  const splits: { id: MeterSplit; label: string }[] = [
+    { id: "meter", label: "לפי מונה המשנה" },
+    { id: "persons", label: "לפי נפשות" },
+    { id: "half", label: "חצי־חצי" },
+  ];
+
+  if (!preview) {
+    return (
+      <Button variant="outline" className="w-full" onClick={() => setOpen(true)}>
+        <Landmark className="h-4 w-4" /> חישוב לפי התעריפים הרשמיים (חשמל, מים, ארנונה)
+      </Button>
+    );
+  }
+  const before = calcPeriod(p, p.vatRate ?? 18);
+  const after = calcPeriod(preview.period, preview.period.vatRate ?? 18);
+  return (
+    <section className="space-y-3 rounded-2xl border bg-card p-4 text-card-foreground">
+      <h2 className="flex items-center gap-2 text-lg font-bold"><Landmark className="h-5 w-5 text-primary" /> חישוב לפי התעריפים הרשמיים</h2>
+      <div className="space-y-1.5">
+        <Label className="text-xs text-muted-foreground">איך מחלקים את המים (כשיש רק מונה מים אחד)</Label>
+        <div className="grid grid-cols-3 gap-1 rounded-lg bg-muted p-1">
+          {splits.map((x) => (
+            <Button key={x.id} variant="ghost" aria-pressed={split === x.id} className={`h-auto py-2 text-xs ${split === x.id ? "bg-card font-semibold shadow-sm" : "text-muted-foreground"}`} onClick={() => setSplit(x.id)}>
+              {x.label}
+            </Button>
+          ))}
+        </div>
+      </div>
+      <ul className="space-y-1 text-sm">
+        {preview.lines.map((l) => <li key={l}>{l}</li>)}
+      </ul>
+      {preview.warnings.length > 0 && (
+        <ul className="space-y-1 rounded-lg bg-warning p-2 text-xs text-warning-foreground">
+          {preview.warnings.map((w) => <li key={w} className="flex gap-1"><AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" /> {w}</li>)}
+        </ul>
+      )}
+      <table className="w-full text-sm">
+        <thead><tr className="text-xs text-muted-foreground"><th className="text-start font-medium" /><th className="text-end font-medium">עכשיו</th><th className="text-end font-medium">לפי התעריפים</th></tr></thead>
+        <tbody>
+          <tr><td>יחידה א'</td><td className="text-end">{ils(before.totalA)}</td><td className="text-end font-semibold">{ils(after.totalA)}</td></tr>
+          <tr><td>יחידה ב'</td><td className="text-end">{ils(before.totalB)}</td><td className="text-end font-semibold">{ils(after.totalB)}</td></tr>
+        </tbody>
+      </table>
+      <div className="flex gap-2">
+        <Button onClick={() => { onApply(preview.period); setOpen(false); toast.success("החשבון חושב לפי התעריפים. אל תשכח לשמור"); }}>החלה על החשבון</Button>
+        <Button variant="ghost" onClick={() => setOpen(false)}>ביטול</Button>
+      </div>
+    </section>
+  );
 }
 
 /** Sets the rate from the supplier's bill so tiered prices and fixed charges split by actual usage. */
@@ -576,6 +650,8 @@ function Editor({ initial, isNew, settings, onClose }: { initial: Period; isNew:
           <Num label='שיעור מע"מ לתקופה זו (%)' value={vatRate} onChange={(n) => setP({ ...p, vatRate: n })} />
         </div>
       </section>
+
+      <OfficialTariffs p={p} contracts={contracts} onApply={setP} />
 
       <div className="grid items-start gap-4 lg:grid-cols-2">
         <MeterCard kind="elec" m={p.elec} set={(elec) => setP({ ...p, elec })} settings={settings} vatRate={vatRate} />

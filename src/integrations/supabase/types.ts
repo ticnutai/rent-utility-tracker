@@ -38,6 +38,8 @@ export type Database = {
       contracts: {
         Row: {
           apartment: string
+          area_m2: number
+          arnona_included: boolean
           created_at: string
           end_date: string | null
           file_name: string | null
@@ -47,6 +49,7 @@ export type Database = {
           landlord_name: string
           monthly_rent: number
           notes: string
+          occupants: number
           option_exercised: boolean
           option_months: number
           option_rent: number
@@ -58,6 +61,8 @@ export type Database = {
         }
         Insert: {
           apartment?: string
+          area_m2?: number
+          arnona_included?: boolean
           created_at?: string
           end_date?: string | null
           file_name?: string | null
@@ -67,6 +72,7 @@ export type Database = {
           landlord_name?: string
           monthly_rent?: number
           notes?: string
+          occupants?: number
           option_exercised?: boolean
           option_months?: number
           option_rent?: number
@@ -78,6 +84,8 @@ export type Database = {
         }
         Update: {
           apartment?: string
+          area_m2?: number
+          arnona_included?: boolean
           created_at?: string
           end_date?: string | null
           file_name?: string | null
@@ -87,6 +95,7 @@ export type Database = {
           landlord_name?: string
           monthly_rent?: number
           notes?: string
+          occupants?: number
           option_exercised?: boolean
           option_months?: number
           option_rent?: number
@@ -242,6 +251,39 @@ export type Database = {
           updated_at?: string
           user_id?: string
           vat_rate?: number
+        }
+        Relationships: []
+      }
+      tariffs: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          notes: string
+          source: string
+          user_id: string
+          valid_from: string
+          value: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: string
+          notes?: string
+          source?: string
+          user_id?: string
+          valid_from: string
+          value: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          notes?: string
+          source?: string
+          user_id?: string
+          valid_from?: string
+          value?: number
         }
         Relationships: []
       }

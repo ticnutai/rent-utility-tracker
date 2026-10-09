@@ -43,6 +43,9 @@ const blank = (apartment: "a" | "b"): Contract => ({
   option_months: 0,
   option_rent: 0,
   option_exercised: false,
+  occupants: 0,
+  area_m2: 0,
+  arnona_included: true,
   notes: "",
   file_path: null,
   file_name: null,
@@ -111,6 +114,8 @@ function ContractsPage() {
                 v={c.option_months ? `${c.option_months} חודשים · ${ils(Number(c.option_rent))}/חודש` : "—"}
               />
               <Info t="ת״ז הדייר" v={c.tenant_id_number || "—"} />
+              <Info t="נפשות · שטח" v={`${c.occupants || "—"} נפשות · ${c.area_m2 ? `${c.area_m2} מ"ר` : "—"}`} />
+              <Info t="ארנונה" v={c.arnona_included ? "כלולה בשכירות" : "בתשלום נפרד"} />
               <Info t="משכיר" v={[c.landlord_name, c.landlord_id_number && `ת״ז ${c.landlord_id_number}`].filter(Boolean).join(" · ") || "—"} />
             </div>
             {c.notes && <p className="whitespace-pre-wrap text-sm text-muted-foreground">{c.notes}</p>}
@@ -223,6 +228,14 @@ function ContractForm({ initial, onDone }: { initial: Contract; onDone: () => vo
         <F l="אופציה — מספר חודשים"><Input type="number" inputMode="numeric" value={c.option_months} onChange={s("option_months", true)} /></F>
         <F l="שכירות באופציה (₪/חודש)"><Input type="number" inputMode="decimal" value={c.option_rent} onChange={s("option_rent", true)} /></F>
       </div>
+      <div className="grid grid-cols-2 gap-3">
+        <F l="מספר נפשות (למכסת המים)"><Input type="number" inputMode="numeric" value={c.occupants} onChange={s("occupants", true)} /></F>
+        <F l='שטח היחידה (מ"ר, לארנונה)'><Input type="number" inputMode="decimal" value={c.area_m2} onChange={s("area_m2", true)} /></F>
+      </div>
+      <label className="flex items-center justify-between rounded-xl bg-muted px-3 py-2.5 text-sm">
+        <span>הארנונה כלולה בשכירות</span>
+        <Switch checked={c.arnona_included} onCheckedChange={(v) => setC({ ...c, arnona_included: v })} />
+      </label>
       <label className="flex items-center justify-between rounded-xl bg-muted px-3 py-2.5 text-sm">
         <span>הדייר מימש את האופציה</span>
         <Switch checked={c.option_exercised} onCheckedChange={(v) => setC({ ...c, option_exercised: v })} />
