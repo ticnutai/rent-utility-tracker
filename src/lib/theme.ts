@@ -22,7 +22,7 @@ export function getStoredMode(): ThemeMode {
 
 export function applyTheme(theme: ThemeId, mode: ThemeMode) {
   const root = document.documentElement;
-  root.dataset.theme = theme;
+  root.dataset["theme"] = theme;
   root.classList.toggle("dark", mode === "dark");
   localStorage.setItem(KEY, theme);
   localStorage.setItem(MODE_KEY, mode);
